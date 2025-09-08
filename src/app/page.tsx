@@ -5,6 +5,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+} from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +40,6 @@ import {
 } from '@/components/ui/tabs';
 import { Icons } from '@/components/icons';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Por favor, insira um e-mail válido.' }),
@@ -70,8 +77,19 @@ type SignUpValues = z.infer<typeof signUpSchema>;
 
 export default function AuthPage() {
   const [personType, setPersonType] = useState<'cpf' | 'cnpj'>('cpf');
+  const [activeTab, setActiveTab] = useState('login');
   const { toast } = useToast();
   const router = useRouter();
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.push('/dashboard');
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   const loginForm = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -104,27 +122,48 @@ export default function AuthPage() {
              confirmPassword: '',
              ...(value === 'cpf' ? { cpf: '' } : { cnpj: '' }),
         });
-        // Atualiza a validação do formulário com base no novo tipo
         signUpForm.trigger();
     }
   };
 
-  const onLogin = (values: LoginValues) => {
-    console.log(values);
-    toast({
-        title: "Login bem-sucedido!",
-        description: "Redirecionando para o dashboard.",
-    });
-    router.push('/dashboard');
+  const onLogin = async (values: LoginValues) => {
+    try {
+        await signInWithEmailAndPassword(auth, values.email, values.password);
+        toast({
+            title: "Login bem-sucedido!",
+            description: "Redirecionando para o dashboard.",
+        });
+        router.push('/dashboard');
+    } catch (error: any) {
+        console.error(error);
+        toast({
+            variant: "destructive",
+            title: "Erro no Login",
+            description: "Credenciais inválidas. Verifique seu e-mail e senha.",
+        });
+    }
   }
 
-  const onRegister = (values: SignUpValues) => {
-    console.log(values);
-    toast({
-        title: "Cadastro realizado!",
-        description: "Sua conta foi criada com sucesso. Faça o login para continuar.",
-    });
-    // Simplesmente muda para a aba de login por enquanto
+  const onRegister = async (values: SignUpValues) => {
+    try {
+        await createUserWithEmailAndPassword(auth, values.email, values.password);
+        toast({
+            title: "Cadastro realizado!",
+            description: "Sua conta foi criada com sucesso. Faça o login para continuar.",
+        });
+        setActiveTab('login');
+    } catch (error: any) {
+        console.error(error);
+        let description = 'Ocorreu um erro ao criar a conta. Tente novamente.';
+        if (error.code === 'auth/email-already-in-use') {
+            description = 'Este e-mail já está sendo utilizado por outra conta.';
+        }
+        toast({
+            variant: "destructive",
+            title: "Erro no Cadastro",
+            description: description,
+        });
+    }
   };
 
   const formatCpf = (value: string) => {
@@ -146,7 +185,6 @@ export default function AuthPage() {
       .substring(0, 18);
   };
 
-  // Observa a mudança no tipo de pessoa e atualiza os valores padrão e a validação.
   useEffect(() => {
     signUpForm.reset({
       personType: personType,
@@ -166,7 +204,7 @@ export default function AuthPage() {
                   <span className="">Maestro Financeiro</span>
             </div>
         </div>
-      <Tabs defaultValue="login" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">Login</TabsTrigger>
           <TabsTrigger value="signup">Cadastro</TabsTrigger>
