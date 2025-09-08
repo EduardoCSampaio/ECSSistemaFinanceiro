@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { transactions } from '@/lib/data';
+import { useEffect, useState } from 'react';
 
 const getMonthlyData = () => {
   const data: { name: string; income: number; expense: number }[] = [];
@@ -37,8 +38,28 @@ const getMonthlyData = () => {
 };
 
 export function OverviewChart() {
-    const data = getMonthlyData();
+    const [data, setData] = useState<{ name: string; income: number; expense: number }[]>([]);
+
+    useEffect(() => {
+      setData(getMonthlyData());
+    }, []);
     
+    if (!data.length) {
+      return (
+        <Card className="xl:col-span-2">
+            <CardHeader>
+                <CardTitle>Visão Geral</CardTitle>
+                <CardDescription>Receitas e despesas dos últimos 6 meses.</CardDescription>
+            </CardHeader>
+            <CardContent className="pl-2">
+              <div className="w-full h-[350px] flex items-center justify-center">
+                <p>Carregando gráfico...</p>
+              </div>
+            </CardContent>
+        </Card>
+      )
+    }
+
     return (
         <Card className="xl:col-span-2">
             <CardHeader>

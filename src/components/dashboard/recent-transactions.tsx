@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import {
@@ -15,10 +17,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { transactions } from '@/lib/data';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
+import type { Transaction } from '@/lib/types';
 
 
 const formatCurrency = (value: number) => {
@@ -26,7 +29,13 @@ const formatCurrency = (value: number) => {
 }
 
 export function RecentTransactions() {
-  const recentTransactions = transactions.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 6);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  
+  useEffect(() => {
+    const sorted = [...transactions].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 6);
+    setRecentTransactions(sorted);
+  }, []);
+
 
   return (
     <Card>
@@ -51,6 +60,13 @@ export function RecentTransactions() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {recentTransactions.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={2} className="h-24 text-center">
+                  Carregando transações...
+                </TableCell>
+              </TableRow>
+            )}
             {recentTransactions.map((transaction) => (
               <TableRow key={transaction.id}>
                 <TableCell>
