@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -16,14 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { accounts, recurringTransactions } from '@/lib/data';
@@ -39,6 +31,18 @@ export default function ProjectionsPage() {
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), []);
 
+  useEffect(() => {
+    const savedIncome = localStorage.getItem('monthlyIncome');
+    if (savedIncome) {
+      setMonthlyIncome(Number(savedIncome));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('monthlyIncome', String(monthlyIncome));
+  }, [monthlyIncome]);
+
+
   const projections = useMemo(() => {
     const results = [];
     let currentBalance = totalBalance;
@@ -49,13 +53,19 @@ export default function ProjectionsPage() {
 
       const monthlyExpenses = recurringTransactions.reduce((sum, transaction) => {
         const startDate = startOfMonth(new Date(transaction.startDate));
-        const monthsSinceStart = differenceInCalendarMonths(projectionDate, startDate);
-        
-        if (monthsSinceStart >= 0) {
-          if (transaction.installments !== null && monthsSinceStart >= transaction.installments) {
-            return sum; 
+        // Garante que a comparação de meses seja sempre positiva ou zero
+        const monthsSinceStart = Math.max(0, differenceInCalendarMonths(projectionDate, startDate));
+
+        if (transaction.installments !== null) {
+          // Se for parcelado, só entra no cálculo se a parcela atual estiver dentro do prazo
+          if (monthsSinceStart < transaction.installments) {
+            return sum + transaction.amount;
           }
-          return sum + transaction.amount;
+        } else {
+          // Se for fixo, entra sempre no cálculo após a data de início
+           if (projectionDate >= startDate) {
+             return sum + transaction.amount;
+           }
         }
         
         return sum;
