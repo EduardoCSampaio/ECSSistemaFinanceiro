@@ -1,47 +1,61 @@
 'use client';
 
+import { useState, useEffect } from "react";
+import { useAuth } from '@/hooks/use-auth';
 import { TransactionsDataTable } from "@/components/transactions-data-table";
-import { accounts as initialAccounts, categories, transactions as initialTransactions } from '@/lib/data';
-import { useState }from "react";
+import { categories } from '@/lib/data';
 import type { Transaction, Account } from "@/lib/types";
+import { getTransactions, addTransaction } from "@/services/transactions";
+import { getAccounts } from "@/services/accounts";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
-  const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
+  const { user, loading: authLoading } = useAuth();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleAddTransaction = (newTransactionData: Omit<Transaction, 'id' | 'account' | 'category'>) => {
-    const account = accounts.find(acc => acc.id === newTransactionData.accountId);
-    const category = categories.find(cat => cat.id === newTransactionData.categoryId);
+  useEffect(() => {
+    if (user) {
+      const unsubscribeTransactions = getTransactions(user.uid, (data) => {
+        setTransactions(data);
+        setLoading(false);
+      });
+      const unsubscribeAccounts = getAccounts(user.uid, setAccounts);
 
-    if (!account || !category) {
-      console.error("Conta ou categoria não encontrada!");
-      // Adicionar um toast de erro aqui seria uma boa melhoria
-      return;
+      return () => {
+        unsubscribeTransactions();
+        unsubscribeAccounts();
+      };
     }
+  }, [user]);
 
-    const newTransaction: Transaction = {
-      ...newTransactionData,
-      id: `trx${Date.now()}`,
-      account,
-      category,
-    };
-    
-    // Atualiza o estado das transações
-    setTransactions(prev => [...prev, newTransaction]);
 
-    // Atualiza o saldo da conta
-    setAccounts(prevAccounts => 
-        prevAccounts.map(acc => {
-            if (acc.id === newTransaction.accountId) {
-                const newBalance = newTransaction.type === 'income'
-                    ? acc.balance + newTransaction.amount
-                    : acc.balance - newTransaction.amount;
-                return { ...acc, balance: newBalance };
-            }
-            return acc;
-        })
-    );
+  const handleAddTransaction = async (newTransactionData: Omit<Transaction, 'id' | 'userId'>) => {
+    if (user) {
+      await addTransaction(user.uid, newTransactionData);
+    }
   };
+
+  if (authLoading || loading) {
+    return (
+      <div className="w-full space-y-4">
+        <div className="flex items-center justify-between py-4">
+          <Skeleton className="h-10 w-80" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-36" />
+          </div>
+        </div>
+        <Skeleton className="h-96 w-full" />
+        <div className="flex items-center justify-end space-x-2 py-4">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-9 w-20" />
+            <Skeleton className="h-9 w-20" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 md:gap-8">

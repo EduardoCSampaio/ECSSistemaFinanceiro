@@ -1,5 +1,8 @@
+import { Timestamp } from "firebase/firestore";
+
 export type Account = {
   id: string;
+  userId: string;
   name: string;
   bank: string;
   balance: number;
@@ -13,33 +16,35 @@ export type Category = {
 
 export type Transaction = {
   id: string;
-  date: Date;
+  userId: string;
+  date: Timestamp;
   description: string;
   amount: number;
   type: 'income' | 'expense';
-  category: Category;
-  account: Account;
-  accountId: string;
   categoryId: string;
+  accountId: string;
 };
 
 export type Budget = {
   id: string;
-  category: Category;
+  userId: string;
+  categoryId: string;
   amount: number;
-  spent: number;
-  categoryId?: string;
 };
+
+export type BudgetWithSpent = Budget & {
+  spent: number;
+};
+
 
 export type RecurringTransaction = {
   id: string;
+  userId: string;
   description: string;
   amount: number;
   dayOfMonth: number;
-  startDate: Date;
+  startDate: Timestamp;
   installments: number | null; // null for indefinite
-  category: Category;
   categoryId: string;
-  account: Account;
   accountId: string;
 };

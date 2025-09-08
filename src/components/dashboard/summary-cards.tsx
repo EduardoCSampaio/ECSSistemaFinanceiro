@@ -1,32 +1,54 @@
-
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Landmark, ArrowUpRight, ArrowDownLeft, PiggyBank } from 'lucide-react';
-import { accounts, transactions } from '@/lib/data';
+import { getAccounts } from '@/services/accounts';
+import { getTransactions } from '@/services/transactions';
+import type { Account, Transaction } from '@/lib/types';
+
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-export function SummaryCards() {
+interface SummaryCardsProps {
+  userId: string;
+}
+
+export function SummaryCards({ userId }: SummaryCardsProps) {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    const unsubscribeAccounts = getAccounts(userId, setAccounts);
+    const unsubscribeTransactions = getTransactions(userId, setTransactions);
+    return () => {
+      unsubscribeAccounts();
+      unsubscribeTransactions();
+    };
+  }, [userId]);
+
   const summary = useMemo(() => {
     const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
-    const thisMonth = new Date().getMonth();
-    const thisYear = new Date().getFullYear();
+    const today = new Date();
+    const thisMonth = today.getMonth();
+    const thisYear = today.getFullYear();
 
     const monthlyIncome = transactions
-      .filter(t => t.type === 'income' && t.date.getMonth() === thisMonth && t.date.getFullYear() === thisYear)
+      .filter(t => {
+        const tDate = t.date.toDate();
+        return t.type === 'income' && tDate.getMonth() === thisMonth && tDate.getFullYear() === thisYear;
+      })
       .reduce((sum, t) => sum + t.amount, 0);
 
     const monthlyExpenses = transactions
-      .filter(t => t.type === 'expense' && t.date.getMonth() === thisMonth && t.date.getFullYear() === thisYear)
+      .filter(t => {
+        const tDate = t.date.toDate();
+        return t.type === 'expense' && tDate.getMonth() === thisMonth && tDate.getFullYear() === thisYear;
+      })
       .reduce((sum, t) => sum + t.amount, 0);
     
-    // Na lib/types.ts, as despesas já são negativas, então somar é o correto.
-    // Mas no data.ts, elas são positivas, então a lógica aqui precisa subtrair.
-    // Para consistência, vamos usar Math.abs e subtrair.
     const savings = monthlyIncome - Math.abs(monthlyExpenses);
 
     return {

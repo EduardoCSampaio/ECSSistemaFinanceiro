@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/use-auth';
 import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,35 +21,42 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AddRecurringSheet } from '@/components/add-recurring-sheet';
-import { accounts as initialAccounts, categories, recurringTransactions as initialRecurring } from '@/lib/data';
+import { categories } from '@/lib/data';
 import type { RecurringTransaction, Account } from '@/lib/types';
 import { differenceInMonths, format } from 'date-fns';
+import { getRecurringTransactions, addRecurringTransaction } from '@/services/recurring';
+import { getAccounts } from '@/services/accounts';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
 export default function RecurringPage() {
-  const [recurring, setRecurring] = useState<RecurringTransaction[]>(initialRecurring);
-  const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
+  const { user, loading: authLoading } = useAuth();
+  const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    if (user) {
+      const unsubscribeRecurring = getRecurringTransactions(user.uid, (data) => {
+        setRecurring(data);
+        setLoading(false);
+      });
+      const unsubscribeAccounts = getAccounts(user.uid, setAccounts);
 
-  const handleAddRecurring = (newData: Omit<RecurringTransaction, 'id' | 'account' | 'category'>) => {
-      const account = accounts.find(acc => acc.id === newData.accountId);
-      const category = categories.find(cat => cat.id === newData.categoryId);
-
-      if (!account || !category) {
-        console.error("Conta ou categoria não encontrada!");
-        return;
-      }
-      
-      const newRecurring: RecurringTransaction = {
-        ...newData,
-        id: `rec${Date.now()}`,
-        account,
-        category,
+      return () => {
+        unsubscribeRecurring();
+        unsubscribeAccounts();
       };
-      setRecurring(prev => [...prev, newRecurring]);
+    }
+  }, [user]);
+
+  const handleAddRecurring = async (newData: Omit<RecurringTransaction, 'id' | 'userId' | 'category' | 'account'>) => {
+    if (user) {
+        await addRecurringTransaction(user.uid, newData);
+    }
   };
 
   const getInstallmentStatus = (item: RecurringTransaction) => {
@@ -56,7 +64,7 @@ export default function RecurringPage() {
       return 'Fixo';
     }
     const now = new Date();
-    const start = new Date(item.startDate);
+    const start = item.startDate.toDate(); // Convert Firestore Timestamp to Date
     const monthsPassed = differenceInMonths(now, start) + 1;
     
     if (monthsPassed > item.installments) {
@@ -66,6 +74,27 @@ export default function RecurringPage() {
     return `${monthsPassed} de ${item.installments}`;
   }
 
+  if (authLoading || loading) {
+    return (
+       <div className="flex flex-1 flex-col gap-4 md:gap-8">
+        <div className="flex items-center">
+          <Skeleton className="h-8 w-72" />
+          <div className="ml-auto flex items-center gap-2">
+            <Skeleton className="h-8 w-48" />
+          </div>
+        </div>
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-6 w-80" />
+                <Skeleton className="h-4 w-96" />
+            </CardHeader>
+            <CardContent>
+                <Skeleton className="h-40 w-full" />
+            </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 md:gap-8">
@@ -107,26 +136,29 @@ export default function RecurringPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                recurring.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.description}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{item.category.name}</Badge>
-                    </TableCell>
-                    <TableCell>
-                        <Badge variant={item.installments === null ? "secondary" : "default"}>
-                            {getInstallmentStatus(item)}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">{item.dayOfMonth}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(item.amount)}</TableCell>
-                    <TableCell className="text-right">
-                        <Button variant="outline" size="sm" disabled>
-                           Registrar Pagamento
-                        </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                recurring.map((item) => {
+                    const category = categories.find(c => c.id === item.categoryId)
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.description}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{category?.name || 'N/A'}</Badge>
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant={item.installments === null ? "secondary" : "default"}>
+                                {getInstallmentStatus(item)}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">{item.dayOfMonth}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(item.amount)}</TableCell>
+                        <TableCell className="text-right">
+                            <Button variant="outline" size="sm" disabled>
+                               Registrar Pagamento
+                            </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                })
               )}
             </TableBody>
           </Table>

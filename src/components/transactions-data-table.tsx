@@ -49,29 +49,36 @@ export const columns: ColumnDef<Transaction>[] = [
   {
     accessorKey: 'date',
     header: 'Data',
-    cell: ({ row }) => formatDate(row.getValue('date')),
+    cell: ({ row }) => {
+        const date = row.getValue('date') as any;
+        return formatDate(date.toDate()); // Firestore timestamp to Date
+    },
   },
   {
     accessorKey: 'description',
     header: 'Descrição',
   },
   {
-    accessorKey: 'category',
+    accessorKey: 'categoryId',
     header: 'Categoria',
-    cell: ({ row }) => {
-        const category = row.getValue('category') as Transaction['category'];
-        return <Badge variant="outline">{category.name}</Badge>
+    cell: ({ row, table }) => {
+        const { categories } = table.options.meta as any;
+        const categoryId = row.getValue('categoryId');
+        const category = categories.find((c: Category) => c.id === categoryId);
+        return <Badge variant="outline">{category?.name || 'N/A'}</Badge>
     },
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))
     },
   },
   {
-    accessorKey: 'account',
+    accessorKey: 'accountId',
     header: 'Conta',
-    cell: ({ row }) => {
-        const account = row.getValue('account') as Transaction['account'];
-        return account.name;
+    cell: ({ row, table }) => {
+        const { accounts } = table.options.meta as any;
+        const accountId = row.getValue('accountId');
+        const account = accounts.find((a: Account) => a.id === accountId);
+        return account?.name || 'N/A';
     },
   },
   {
@@ -89,7 +96,7 @@ export const columns: ColumnDef<Transaction>[] = [
 
 interface TransactionsDataTableProps {
   transactions: Transaction[];
-  onAddTransaction: (data: Omit<Transaction, 'id' | 'account' | 'category'>) => void;
+  onAddTransaction: (data: Omit<Transaction, 'id' | 'userId'>) => void;
   accounts: Account[];
   categories: Category[];
 }
@@ -118,6 +125,10 @@ export function TransactionsDataTable({ transactions, onAddTransaction, accounts
       sorting,
       columnFilters,
       columnVisibility,
+    },
+    meta: {
+        accounts,
+        categories
     },
     initialState: {
         pagination: {
@@ -149,6 +160,14 @@ export function TransactionsDataTable({ transactions, onAddTransaction, accounts
                 .getAllColumns()
                 .filter((column) => column.getCanHide())
                 .map((column) => {
+                    // Map column IDs to Portuguese labels
+                    const columnLabels: { [key: string]: string } = {
+                        date: 'Data',
+                        description: 'Descrição',
+                        categoryId: 'Categoria',
+                        accountId: 'Conta',
+                        amount: 'Valor',
+                    };
                     return (
                     <DropdownMenuCheckboxItem
                         key={column.id}
@@ -158,7 +177,7 @@ export function TransactionsDataTable({ transactions, onAddTransaction, accounts
                         column.toggleVisibility(!!value)
                         }
                     >
-                        {column.id}
+                        {columnLabels[column.id] || column.id}
                     </DropdownMenuCheckboxItem>
                     )
                 })}

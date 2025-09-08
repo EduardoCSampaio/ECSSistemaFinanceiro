@@ -1,10 +1,7 @@
-import type { Account, Category, Transaction, Budget, RecurringTransaction } from '@/lib/types';
+import type { Category } from '@/lib/types';
 import { Landmark, ShoppingCart, Utensils, Home, Car, Activity, Shirt, Gift, Film, Book, GraduationCap, ArrowDown, ArrowUp, CalendarClock } from 'lucide-react';
 
-export const accounts: Account[] = [
-  { id: 'acc1', name: 'Conta Corrente', bank: 'Banco Principal', balance: 0 },
-];
-
+// Static data like categories can remain here
 export const categories: Category[] = [
   { id: 'cat1', name: 'Moradia', icon: Home },
   { id: 'cat2', name: 'Alimentação', icon: Utensils },
@@ -22,8 +19,8 @@ export const categories: Category[] = [
   { id: 'cat14', name: 'Contas Fixas', icon: CalendarClock },
 ];
 
-export const transactions: Transaction[] = [];
-
-export const budgets: Budget[] = [];
-
-export const recurringTransactions: RecurringTransaction[] = [];
+// User-specific data is now fetched from Firestore, so these arrays are empty.
+export const accounts = [];
+export const transactions = [];
+export const budgets = [];
+export const recurringTransactions = [];

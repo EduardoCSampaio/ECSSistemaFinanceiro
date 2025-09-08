@@ -1,9 +1,8 @@
-
 'use client';
 
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -20,19 +19,31 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { transactions } from '@/lib/data';
+import { categories } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import type { Transaction } from '@/lib/types';
+import { getTransactions } from '@/services/transactions';
 
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-export function RecentTransactions() {
+interface RecentTransactionsProps {
+  userId: string;
+}
+
+export function RecentTransactions({ userId }: RecentTransactionsProps) {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = getTransactions(userId, setTransactions);
+    return () => unsubscribe();
+  }, [userId]);
+
   const recentTransactions = useMemo(() => {
     return [...transactions]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => b.date.toDate().getTime() - a.date.toDate().getTime())
       .slice(0, 6);
   }, [transactions]);
 
@@ -67,20 +78,23 @@ export function RecentTransactions() {
                 </TableCell>
               </TableRow>
             ) : (
-              recentTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell>
-                    <div className="font-medium">{transaction.description}</div>
-                    <div className="text-sm text-muted-foreground">{transaction.category.name}</div>
-                  </TableCell>
-                  <TableCell className={cn(
-                    "text-right font-medium",
-                    transaction.type === 'income' ? 'text-emerald-500' : 'text-red-500'
-                  )}>
-                    {transaction.type === 'expense' ? '-' : ''}{formatCurrency(Math.abs(transaction.amount))}
-                  </TableCell>
-                </TableRow>
-              ))
+              recentTransactions.map((transaction) => {
+                const category = categories.find(c => c.id === transaction.categoryId);
+                return (
+                    <TableRow key={transaction.id}>
+                    <TableCell>
+                        <div className="font-medium">{transaction.description}</div>
+                        <div className="text-sm text-muted-foreground">{category?.name || 'N/A'}</div>
+                    </TableCell>
+                    <TableCell className={cn(
+                        "text-right font-medium",
+                        transaction.type === 'income' ? 'text-emerald-500' : 'text-red-500'
+                    )}>
+                        {transaction.type === 'expense' ? '-' : ''}{formatCurrency(Math.abs(transaction.amount))}
+                    </TableCell>
+                    </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

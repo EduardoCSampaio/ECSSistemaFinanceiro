@@ -1,11 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Menu, User } from 'lucide-react';
-import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { usePathname, useRouter } from 'next/navigation';
+import { Menu } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
@@ -15,7 +12,7 @@ import { Icons } from '@/components/icons';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
+import { AuthProvider, useAuth } from '@/hooks/use-auth';
 
 function AuthLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -81,30 +78,10 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
 function RootBody({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const router = useRouter();
-    const [user, setUser] = useState<FirebaseUser | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
+    const { user, loading, router } = useAuth();
     
-    useEffect(() => {
-        if (!loading) {
-            const isAuthRoute = pathname === '/' || pathname.startsWith('/auth');
-            if (!user && !isAuthRoute) {
-                router.push('/');
-            }
-            if (user && isAuthRoute) {
-                router.push('/dashboard');
-            }
-        }
-    }, [user, loading, pathname, router]);
-
+    // Redirect logic is now inside the useAuth hook
+    
     if (loading) {
        return (
             <div className="flex items-center justify-center min-h-screen">
@@ -127,6 +104,7 @@ function RootBody({ children }: { children: React.ReactNode }) {
     }
     
     // Fallback for edge cases, e.g. navigating during auth state change
+    // Or when redirecting
     return (
         <div className="flex items-center justify-center min-h-screen">
              <div className="flex items-center gap-2 font-semibold text-primary text-2xl">
@@ -150,7 +128,9 @@ export default function RootLayout({
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn('font-body antialiased', 'bg-background text-foreground')}>
-        <RootBody>{children}</RootBody>
+        <AuthProvider>
+            <RootBody>{children}</RootBody>
+        </AuthProvider>
       </body>
     </html>
   );

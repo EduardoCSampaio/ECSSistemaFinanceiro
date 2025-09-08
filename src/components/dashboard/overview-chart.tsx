@@ -1,9 +1,7 @@
-
 'use client';
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
-import { useMemo } from 'react';
-
+import { useMemo, useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -11,9 +9,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { transactions } from '@/lib/data';
+import { getTransactions } from '@/services/transactions';
+import type { Transaction } from '@/lib/types';
 
-const getMonthlyData = () => {
+interface OverviewChartProps {
+  userId: string;
+}
+
+const getMonthlyData = (transactions: Transaction[]) => {
   const dataMap = new Map<string, { name: string; income: number; expense: number }>();
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
@@ -23,15 +26,15 @@ const getMonthlyData = () => {
   for (let i = 0; i < 6; i++) {
     const monthDate = new Date(sixMonthsAgo);
     monthDate.setMonth(sixMonthsAgo.getMonth() + i);
-    const monthName = monthDate.toLocaleString('default', { month: 'short' });
-    dataMap.set(monthName, { name: monthName, income: 0, expense: 0 });
+    const monthName = monthDate.toLocaleString('pt-BR', { month: 'short' });
+    dataMap.set(monthName, { name: monthName.charAt(0).toUpperCase() + monthName.slice(1), income: 0, expense: 0 });
   }
 
   transactions.forEach(t => {
-    const transactionDate = new Date(t.date);
+    const transactionDate = t.date.toDate(); // Convert Firestore Timestamp to Date
     if (transactionDate >= sixMonthsAgo) {
-      const monthName = transactionDate.toLocaleString('default', { month: 'short' });
-      const monthData = dataMap.get(monthName);
+      const monthName = transactionDate.toLocaleString('pt-BR', { month: 'short' });
+      const monthData = dataMap.get(monthName.charAt(0).toUpperCase() + monthName.slice(1));
       if (monthData) {
         if (t.type === 'income') {
           monthData.income += t.amount;
@@ -45,8 +48,15 @@ const getMonthlyData = () => {
   return Array.from(dataMap.values());
 };
 
-export function OverviewChart() {
-    const data = useMemo(() => getMonthlyData(), [transactions]);
+export function OverviewChart({ userId }: OverviewChartProps) {
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+    useEffect(() => {
+        const unsubscribe = getTransactions(userId, setTransactions);
+        return () => unsubscribe();
+    }, [userId]);
+    
+    const data = useMemo(() => getMonthlyData(transactions), [transactions]);
     
     if (!data.length) {
       return (

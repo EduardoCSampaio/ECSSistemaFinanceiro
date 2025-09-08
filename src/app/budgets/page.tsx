@@ -1,52 +1,66 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AlertCircle, PlusCircle, Target } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { budgets as initialBudgets, categories, transactions } from '@/lib/data';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { categories } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { AddBudgetSheet } from '@/components/add-budget-sheet';
-import type { Budget } from '@/lib/types';
-
+import type { Budget, BudgetWithSpent } from '@/lib/types';
+import { getBudgetsWithSpent, addBudget } from '@/services/budgets';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
 export default function BudgetsPage() {
-  const [budgets, setBudgets] = useState<Budget[]>(initialBudgets);
+  const { user, loading: authLoading } = useAuth();
+  const [budgets, setBudgets] = useState<BudgetWithSpent[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleAddBudget = (newBudgetData: Omit<Budget, 'id' | 'category' | 'spent'>) => {
-    const category = categories.find(cat => cat.id === newBudgetData.categoryId);
-    if (!category) return;
+  useEffect(() => {
+    if (user) {
+      const unsubscribe = getBudgetsWithSpent(user.uid, (data) => {
+        setBudgets(data);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }
+  }, [user]);
 
-    const newBudget: Budget = {
-      ...newBudgetData,
-      id: `bud${Date.now()}`,
-      spent: 0, // Inicialmente o gasto é zero
-      category,
-    };
-    setBudgets(prev => [...prev, newBudget]);
+  const handleAddBudget = async (newBudgetData: Omit<Budget, 'id' | 'userId'>) => {
+    if (user) {
+      await addBudget(user.uid, newBudgetData);
+    }
   };
-  
-  const processedBudgets = useMemo(() => {
-    return budgets.map(budget => {
-      const spent = transactions
-        .filter(t => t.categoryId === budget.category.id && t.type === 'expense')
-        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      return { ...budget, spent };
-    });
-  }, [budgets, transactions]);
 
+  if (authLoading || loading) {
+     return (
+      <div className="flex flex-1 flex-col gap-4 md:gap-8">
+        <div className="flex items-center">
+          <Skeleton className="h-8 w-48" />
+          <div className="ml-auto flex items-center gap-2">
+            <Skeleton className="h-8 w-36" />
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 md:gap-8">
@@ -63,7 +77,7 @@ export default function BudgetsPage() {
           </AddBudgetSheet>
         </div>
       </div>
-       {processedBudgets.length === 0 ? (
+       {budgets.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">Nenhum orçamento cadastrado. Crie um para monitorar seus gastos.</p>
@@ -71,17 +85,18 @@ export default function BudgetsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {processedBudgets.map((budget) => {
-            const percentage = (budget.spent / budget.amount) * 100;
+          {budgets.map((budget) => {
+            const percentage = budget.amount > 0 ? (budget.spent / budget.amount) * 100 : 0;
             const isOverBudget = percentage > 100;
+            const category = categories.find(c => c.id === budget.categoryId);
 
             return (
               <Card key={budget.id}>
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base font-medium flex items-center gap-2">
-                      <budget.category.icon className="h-5 w-5 text-muted-foreground" />
-                      {budget.category.name}
+                      {category?.icon && <category.icon className="h-5 w-5 text-muted-foreground" />}
+                      {category?.name || 'Categoria'}
                     </CardTitle>
                     <Target className="h-5 w-5 text-muted-foreground" />
                   </div>
