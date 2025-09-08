@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import {
-  getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   onAuthStateChanged,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import {
+  GoogleReCaptchaProvider,
+  useGoogleReCaptcha,
+} from 'react-google-recaptcha-v3';
+import { signIn as serverSignIn } from './actions';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -75,11 +79,12 @@ type LoginValues = z.infer<typeof loginSchema>;
 type SignUpValues = z.infer<typeof signUpSchema>;
 
 
-export default function AuthPage() {
+function AuthPageComponent() {
   const [personType, setPersonType] = useState<'cpf' | 'cnpj'>('cpf');
   const [activeTab, setActiveTab] = useState('login');
   const { toast } = useToast();
   const router = useRouter();
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   // Redirect if user is already logged in
   useEffect(() => {
@@ -125,9 +130,31 @@ export default function AuthPage() {
         signUpForm.trigger();
     }
   };
+  
+  const handleReCaptchaVerify = useCallback(async () => {
+    if (!executeRecaptcha) {
+        toast({
+            variant: "destructive",
+            title: "Erro no reCAPTCHA",
+            description: "Não foi possível carregar o reCAPTCHA. Tente novamente mais tarde.",
+        });
+        return null;
+    }
+    const token = await executeRecaptcha('login');
+    return token;
+  }, [executeRecaptcha, toast]);
+
 
   const onLogin = async (values: LoginValues) => {
+    const token = await handleReCaptchaVerify();
+    if (!token) return;
+
     try {
+        const recaptchaResult = await serverSignIn({ token });
+        if (!recaptchaResult.success) {
+            throw new Error(recaptchaResult.error || "Falha na verificação do reCAPTCHA.");
+        }
+
         await signInWithEmailAndPassword(auth, values.email, values.password);
         toast({
             title: "Login bem-sucedido!",
@@ -244,7 +271,9 @@ export default function AuthPage() {
                                     </FormItem>
                                 )}
                             />
-                            <Button className="w-full" type="submit">Entrar</Button>
+                            <Button className="w-full" type="submit" disabled={loginForm.formState.isSubmitting}>
+                                {loginForm.formState.isSubmitting ? 'Verificando...' : 'Entrar'}
+                            </Button>
                          </form>
                      </Form>
                 </CardContent>
@@ -369,4 +398,23 @@ export default function AuthPage() {
       </Tabs>
     </div>
   );
+}
+
+export default function AuthPage() {
+    const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+    
+    if (!recaptchaSiteKey) {
+        return (
+            <div className="w-full max-w-md text-center">
+                <p className="text-destructive">A chave de site do reCAPTCHA não está configurada.</p>
+                <p className="text-muted-foreground text-sm">Por favor, adicione NEXT_PUBLIC_RECAPTCHA_SITE_KEY ao seu arquivo .env</p>
+            </div>
+        )
+    }
+    
+    return (
+        <GoogleReCaptchaProvider reCaptchaKey={recaptchaSiteKey}>
+            <AuthPageComponent />
+        </GoogleReCaptchaProvider>
+    );
 }

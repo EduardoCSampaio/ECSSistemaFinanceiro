@@ -3,7 +3,6 @@
 import { auth } from '@/lib/firebase/server';
 import { cookies } from 'next/headers';
 import {
-  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 
@@ -33,20 +32,34 @@ export async function signUp(data: any) {
   }
 }
 
-export async function signIn(data: any) {
-  try {
-    // Firebase Auth doesn't have a direct server-side signInWithEmailAndPassword
-    // that returns an ID token directly. This is a workaround for server-side session creation.
-    // In a real app, you'd typically handle sign-in on the client and post the ID token here.
-    // For this example, we'll simulate the client-side token generation.
-    // This part requires a custom solution or client-side interaction.
-    // The placeholder below won't work directly in a real server action without client token.
-    return { success: false, error: "Server-side sign-in needs client ID token." };
+// In a real app, you'd typically handle sign-in on the client and post the ID token here.
+// For this example, we'll simulate the client-side token generation.
+// This part requires a custom solution or client-side interaction.
+// The placeholder below won't work directly in a real server action without client token.
+export async function signIn(data: { token: string }) {
+    try {
+        const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `secret=${process.env.RECAPTCHA_SECRET_KEY}&response=${data.token}`,
+        });
+        const recaptchaResponse = await response.json();
+        
+        if (!recaptchaResponse.success || recaptchaResponse.score < 0.5) {
+            return { success: false, error: "Falha na verificação do reCAPTCHA." };
+        }
 
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+        // Since we can't directly sign in on the server with email/password to get an ID token,
+        // this part remains conceptual for server actions.
+        // The actual sign-in will be client-side, and this action could be used to create a session
+        // if the ID token were passed from the client.
+        return { success: true, needsClientLogin: true };
+
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
 }
+
 
 export async function signOut() {
   cookies().delete(SESSION_COOKIE_NAME);
