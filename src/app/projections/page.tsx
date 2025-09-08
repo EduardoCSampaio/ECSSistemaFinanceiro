@@ -26,12 +26,13 @@ import {
   TableCell
 } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-import { addMonths, startOfMonth, differenceInCalendarMonths } from 'date-fns';
+import { addMonths, startOfMonth, endOfMonth, differenceInCalendarMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
-import type { Account, RecurringTransaction, RecurringIncome } from '@/lib/types';
+import type { Account, RecurringTransaction, RecurringIncome, Transaction } from '@/lib/types';
 import { getAccounts } from '@/services/accounts';
 import { getRecurringTransactions } from '@/services/recurring';
 import { getRecurringIncomes } from '@/services/recurringIncomes';
+import { getTransactions } from '@/services/transactions';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const formatCurrency = (value: number) => {
@@ -43,6 +44,7 @@ export default function ProjectionsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringTransaction[]>([]);
   const [recurringIncomes, setRecurringIncomes] = useState<RecurringIncome[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthsToProject, setMonthsToProject] = useState(6);
 
@@ -51,9 +53,10 @@ export default function ProjectionsPage() {
       let accountsLoaded = false;
       let expensesLoaded = false;
       let incomesLoaded = false;
+      let transactionsLoaded = false;
 
       const checkLoading = () => {
-        if (accountsLoaded && expensesLoaded && incomesLoaded) {
+        if (accountsLoaded && expensesLoaded && incomesLoaded && transactionsLoaded) {
           setLoading(false);
         }
       }
@@ -73,11 +76,17 @@ export default function ProjectionsPage() {
         incomesLoaded = true;
         checkLoading();
       });
+       const unsubscribeTransactions = getTransactions(user.uid, (data) => {
+        setTransactions(data);
+        transactionsLoaded = true;
+        checkLoading();
+      });
 
       return () => {
         unsubscribeAccounts();
         unsubscribeExpenses();
         unsubscribeIncomes();
+        unsubscribeTransactions();
       };
     }
   }, [user]);
@@ -93,42 +102,48 @@ export default function ProjectionsPage() {
 
     for (let i = 0; i < monthsToProject; i++) {
       const projectionDate = startOfMonth(addMonths(today, i));
+      const projectionMonthEnd = endOfMonth(projectionDate);
 
-      const monthlyExpenses = recurringExpenses.reduce((sum, transaction) => {
+      // --- Cálculos de Projeção ---
+      const monthlyProjectedExpenses = recurringExpenses.reduce((sum, transaction) => {
         const startDate = startOfMonth(transaction.startDate.toDate());
         const monthsSinceStart = differenceInCalendarMonths(projectionDate, startDate);
 
-        if (monthsSinceStart < 0) {
-            return sum; // Expense hasn't started yet
-        }
-
+        if (monthsSinceStart < 0) return sum; 
         if (transaction.installments !== null) {
-          // It's an installment plan
-          if (monthsSinceStart < transaction.installments) {
-            return sum + transaction.amount;
-          }
+          if (monthsSinceStart < transaction.installments) return sum + transaction.amount;
         } else {
-           // It's a fixed recurring expense
            return sum + transaction.amount;
         }
-        
         return sum;
       }, 0);
       
-      const netMonthly = totalMonthlyIncome - monthlyExpenses;
-      currentBalance += netMonthly;
+      const netProjectedMonthly = totalMonthlyIncome - monthlyProjectedExpenses;
+      currentBalance += netProjectedMonthly;
+
+      // --- Cálculos do Realizado ---
+      const monthlyActualIncomes = transactions
+        .filter(t => t.type === 'income' && t.date.toDate() >= projectionDate && t.date.toDate() <= projectionMonthEnd)
+        .reduce((sum, t) => sum + t.amount, 0);
+      
+      const monthlyActualExpenses = transactions
+        .filter(t => t.type === 'expense' && t.date.toDate() >= projectionDate && t.date.toDate() <= projectionMonthEnd)
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+      const netActualMonthly = monthlyActualIncomes - monthlyActualExpenses;
       
       results.push({
         month: projectionDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }),
-        income: totalMonthlyIncome,
-        expense: monthlyExpenses,
-        net: netMonthly,
+        projectedIncome: totalMonthlyIncome,
+        projectedExpense: monthlyProjectedExpenses,
+        netProjected: netProjectedMonthly,
+        netActual: netActualMonthly,
         endBalance: currentBalance,
       });
     }
 
     return results;
-  }, [monthsToProject, totalBalance, recurringIncomes, recurringExpenses]);
+  }, [monthsToProject, totalBalance, recurringIncomes, recurringExpenses, transactions]);
   
   if (authLoading || loading) {
      return (
@@ -175,9 +190,9 @@ export default function ProjectionsPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle>Demonstração de Resultados Futuros (DRE)</CardTitle>
+          <CardTitle>Demonstração de Resultados (Previsto vs. Realizado)</CardTitle>
           <CardDescription>
-            Uma previsão dos seus resultados financeiros com base em despesas e receitas recorrentes.
+            Compare suas finanças projetadas (recorrentes) com as transações reais de cada mês.
             Saldo Inicial: <strong>{formatCurrency(totalBalance)}</strong>
           </CardDescription>
         </CardHeader>
@@ -186,9 +201,10 @@ export default function ProjectionsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[150px]">Mês</TableHead>
-                <TableHead className="text-right text-emerald-500">Receitas Previstas</TableHead>
-                <TableHead className="text-right text-red-500">Despesas Previstas</TableHead>
-                <TableHead className="text-right">Resultado do Mês</TableHead>
+                <TableHead className="text-right text-sky-500">Receitas Previstas</TableHead>
+                <TableHead className="text-right text-orange-500">Despesas Previstas</TableHead>
+                <TableHead className="text-right">Resultado Previsto</TableHead>
+                <TableHead className="text-right">Resultado Real</TableHead>
                 <TableHead className="text-right">Saldo Final Estimado</TableHead>
               </TableRow>
             </TableHeader>
@@ -196,12 +212,15 @@ export default function ProjectionsPage() {
               {projections.map((p, index) => (
                 <TableRow key={index}>
                   <TableCell className="font-medium capitalize">{p.month}</TableCell>
-                  <TableCell className="text-right text-emerald-500">{formatCurrency(p.income)}</TableCell>
-                  <TableCell className="text-right text-red-500">{formatCurrency(p.expense)}</TableCell>
-                  <TableCell className={cn("text-right font-semibold", p.net >= 0 ? 'text-emerald-500' : 'text-red-500')}>
-                    {formatCurrency(p.net)}
+                  <TableCell className="text-right text-sky-500">{formatCurrency(p.projectedIncome)}</TableCell>
+                  <TableCell className="text-right text-orange-500">{formatCurrency(p.projectedExpense)}</TableCell>
+                  <TableCell className={cn("text-right font-semibold", p.netProjected >= 0 ? 'text-foreground' : 'text-destructive')}>
+                    {formatCurrency(p.netProjected)}
                   </TableCell>
-                  <TableCell className={cn("text-right font-bold", p.endBalance >= 0 ? 'text-foreground' : 'text-red-500')}>
+                  <TableCell className={cn("text-right font-semibold", p.netActual >= 0 ? 'text-emerald-500' : 'text-red-500')}>
+                    {formatCurrency(p.netActual)}
+                  </TableCell>
+                  <TableCell className={cn("text-right font-bold", p.endBalance >= 0 ? 'text-foreground' : 'text-destructive')}>
                     {formatCurrency(p.endBalance)}
                   </TableCell>
                 </TableRow>
