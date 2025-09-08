@@ -23,6 +23,7 @@ import {
   SheetTitle,
   SheetFooter,
   SheetClose,
+  SheetTrigger,
 } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import type { Account } from '@/lib/types';
@@ -69,7 +70,9 @@ export function AddAccountSheet({ children, onSave }: AddAccountSheetProps) {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      {children}
+      <SheetTrigger asChild>
+        {children}
+      </SheetTrigger>
       <SheetContent className="sm:max-w-lg">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex h-full flex-col">
