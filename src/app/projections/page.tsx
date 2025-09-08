@@ -24,50 +24,56 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { ArrowUp, ArrowDown } from 'lucide-react';
-import { transactions, accounts } from '@/lib/data';
+import { accounts, recurringTransactions } from '@/lib/data';
+import { addMonths, differenceInMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const getRecurringTransactions = () => {
-    // Para esta demonstração, vamos simular transações recorrentes.
-    // Em um app real, você teria uma lógica para identificá-las ou marcá-las.
-    const recurringIncome = transactions.find(t => t.description === 'Salário Mensal');
-    const recurringExpenses = transactions.filter(t => ['Aluguel', 'Conta de Luz'].includes(t.description));
-    
-    return {
-        incomes: recurringIncome ? [recurringIncome] : [],
-        expenses: recurringExpenses
-    }
-}
-
 export default function ProjectionsPage() {
   const [monthsToProject, setMonthsToProject] = useState(6);
   const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
   const projections = useMemo(() => {
-    const { incomes, expenses } = getRecurringTransactions();
-    const monthlyIncome = incomes.reduce((sum, t) => sum + t.amount, 0);
-    const monthlyExpense = expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    const netMonthly = monthlyIncome - monthlyExpense;
-
     const results = [];
     let currentBalance = totalBalance;
 
     for (let i = 1; i <= monthsToProject; i++) {
-      const projectionDate = new Date();
-      projectionDate.setMonth(projectionDate.getMonth() + i);
+      const projectionDate = addMonths(new Date(), i-1);
 
-      currentBalance += netMonthly;
+      const monthlyExpenses = recurringTransactions.reduce((sum, transaction) => {
+        const startDate = new Date(transaction.startDate);
+        const monthsSinceStart = differenceInMonths(projectionDate, startDate);
 
+        // A transação já começou?
+        if (monthsSinceStart >= 0) {
+          // Se for parcelada, já acabou?
+          if (transaction.installments !== null && monthsSinceStart >= transaction.installments) {
+            return sum; // Parcela já finalizou, não soma
+          }
+          // Se for fixa ou parcela ativa, soma a despesa
+          return sum + transaction.amount;
+        }
+        
+        return sum; // Transação ainda não começou
+      }, 0);
+
+      // Por enquanto, vamos assumir que não há receitas recorrentes cadastradas
+      const monthlyIncome = 0; 
+      const netMonthly = monthlyIncome - monthlyExpenses;
+      
+      if (i > 1) { // O saldo do primeiro mês já é calculado com o primeiro net
+        currentBalance += netMonthly;
+      } else { // Para o primeiro mês, o saldo inicial é o total e o final é calculado
+        currentBalance = totalBalance + netMonthly;
+      }
+      
       results.push({
         month: projectionDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }),
         income: monthlyIncome,
-        expense: monthlyExpense,
+        expense: monthlyExpenses,
         net: netMonthly,
         endBalance: currentBalance,
       });
@@ -99,7 +105,7 @@ export default function ProjectionsPage() {
         <CardHeader>
           <CardTitle>Demonstração de Resultados Futuros (DRE)</CardTitle>
           <CardDescription>
-            Uma previsão dos seus resultados financeiros com base em receitas e despesas recorrentes.
+            Uma previsão dos seus resultados financeiros com base em despesas recorrentes cadastradas.
             Saldo Inicial: <strong>{formatCurrency(totalBalance)}</strong>
           </CardDescription>
         </CardHeader>
@@ -120,10 +126,10 @@ export default function ProjectionsPage() {
                   <TableCell className="font-medium capitalize">{p.month}</TableCell>
                   <TableCell className="text-right text-emerald-500">{formatCurrency(p.income)}</TableCell>
                   <TableCell className="text-right text-red-500">{formatCurrency(p.expense)}</TableCell>
-                  <TableCell className={cn("text-right font-semibold", p.net > 0 ? 'text-emerald-500' : 'text-red-500')}>
+                  <TableCell className={cn("text-right font-semibold", p.net >= 0 ? 'text-emerald-500' : 'text-red-500')}>
                     {formatCurrency(p.net)}
                   </TableCell>
-                  <TableCell className={cn("text-right font-bold", p.endBalance > 0 ? 'text-foreground' : 'text-red-500')}>
+                  <TableCell className={cn("text-right font-bold", p.endBalance >= 0 ? 'text-foreground' : 'text-red-500')}>
                     {formatCurrency(p.endBalance)}
                   </TableCell>
                 </TableRow>
@@ -133,7 +139,7 @@ export default function ProjectionsPage() {
         </CardContent>
         <CardFooter>
             <p className="text-xs text-muted-foreground">
-                * Projeções são baseadas em 'Salário Mensal' como renda recorrente e 'Aluguel' e 'Conta de Luz' como despesas recorrentes. A precisão pode variar.
+                * Projeções são baseadas apenas nas contas recorrentes cadastradas. A precisão pode variar.
             </p>
         </CardFooter>
       </Card>
