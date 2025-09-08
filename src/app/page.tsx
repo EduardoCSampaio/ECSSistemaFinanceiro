@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -147,7 +147,7 @@ export default function AuthPage() {
   };
 
   // Observa a mudança no tipo de pessoa e atualiza os valores padrão e a validação.
-  React.useEffect(() => {
+  useEffect(() => {
     signUpForm.reset({
       personType: personType,
       name: '',
