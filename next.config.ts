@@ -24,6 +24,19 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'x-pathname',
+            value: '/:path*',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
