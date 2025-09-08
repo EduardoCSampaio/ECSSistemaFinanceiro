@@ -10,6 +10,7 @@ import {
   PieChart,
   TrendingUp,
   CalendarClock,
+  Repeat,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -31,7 +32,8 @@ const navItems: NavItem[] = [
   { href: '/transactions', label: 'Transações', icon: Wallet },
   { href: '/accounts', label: 'Contas', icon: Landmark },
   { href: '/budgets', label: 'Orçamentos', icon: PieChart },
-  { href: '/recurring', label: 'Contas a Pagar', icon: CalendarClock },
+  { href: '/recurring-expenses', label: 'Despesas Recorrentes', icon: CalendarClock },
+  { href: '/recurring-incomes', label: 'Receitas Recorrentes', icon: Repeat },
   { href: '/reports', label: 'Relatórios', icon: FileText },
   { href: '/projections', label: 'Projeções', icon: TrendingUp },
 ];

@@ -25,93 +25,63 @@ import {
   TableBody,
   TableCell
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { addMonths, startOfMonth, differenceInCalendarMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
-import type { Account, RecurringTransaction } from '@/lib/types';
+import type { Account, RecurringTransaction, RecurringIncome } from '@/lib/types';
 import { getAccounts } from '@/services/accounts';
 import { getRecurringTransactions } from '@/services/recurring';
-import { getPreferences, savePreferences } from '@/services/preferences';
+import { getRecurringIncomes } from '@/services/recurringIncomes';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-// Debounce function
-function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<F>): void => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), waitFor);
-  };
-}
-
 export default function ProjectionsPage() {
   const { user, loading: authLoading } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringTransaction[]>([]);
+  const [recurringIncomes, setRecurringIncomes] = useState<RecurringIncome[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   const [monthsToProject, setMonthsToProject] = useState(6);
-  const [monthlyIncome, setMonthlyIncome] = useState(0);
-
-  // Function to save income to Firestore
-  const saveIncome = useCallback(async (income: number) => {
-      if (!user) return;
-      try {
-        await savePreferences(user.uid, { monthlyIncome: income });
-        toast({
-            title: 'Receita Salva',
-            description: 'Sua receita mensal foi atualizada com sucesso.',
-            duration: 2000,
-        });
-      } catch (error) {
-          console.error("Failed to save income:", error);
-           toast({
-            variant: "destructive",
-            title: 'Erro ao Salvar',
-            description: 'Não foi possível salvar sua receita mensal.',
-          });
-      }
-  }, [user, toast]);
-
-  // Create a debounced version of the save function
-  const debouncedSaveIncome = useCallback(debounce(saveIncome, 1500), [saveIncome]);
 
   useEffect(() => {
     if (user) {
-      // Fetch initial preferences
-      getPreferences(user.uid).then(prefs => {
-        if (prefs && prefs.monthlyIncome) {
-          setMonthlyIncome(prefs.monthlyIncome);
+      let accountsLoaded = false;
+      let expensesLoaded = false;
+      let incomesLoaded = false;
+
+      const checkLoading = () => {
+        if (accountsLoaded && expensesLoaded && incomesLoaded) {
+          setLoading(false);
         }
-      });
-      
+      }
+
       const unsubscribeAccounts = getAccounts(user.uid, (data) => {
         setAccounts(data);
-        if(!recurring.length) setLoading(false);
+        accountsLoaded = true;
+        checkLoading();
       });
-      const unsubscribeRecurring = getRecurringTransactions(user.uid, (data) => {
-        setRecurring(data);
-        setLoading(false);
+      const unsubscribeExpenses = getRecurringTransactions(user.uid, (data) => {
+        setRecurringExpenses(data);
+        expensesLoaded = true;
+        checkLoading();
+      });
+      const unsubscribeIncomes = getRecurringIncomes(user.uid, (data) => {
+        setRecurringIncomes(data);
+        incomesLoaded = true;
+        checkLoading();
       });
 
       return () => {
         unsubscribeAccounts();
-        unsubscribeRecurring();
+        unsubscribeExpenses();
+        unsubscribeIncomes();
       };
     }
   }, [user]);
-  
-  const handleIncomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const newIncome = Number(e.target.value);
-      setMonthlyIncome(newIncome);
-      debouncedSaveIncome(newIncome);
-  }
 
   const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
@@ -120,10 +90,12 @@ export default function ProjectionsPage() {
     let currentBalance = totalBalance;
     const today = new Date();
 
+    const totalMonthlyIncome = recurringIncomes.reduce((sum, income) => sum + income.amount, 0);
+
     for (let i = 0; i < monthsToProject; i++) {
       const projectionDate = startOfMonth(addMonths(today, i));
 
-      const monthlyExpenses = recurring.reduce((sum, transaction) => {
+      const monthlyExpenses = recurringExpenses.reduce((sum, transaction) => {
         const startDate = startOfMonth(transaction.startDate.toDate());
         const monthsSinceStart = Math.max(0, differenceInCalendarMonths(projectionDate, startDate));
 
@@ -140,12 +112,12 @@ export default function ProjectionsPage() {
         return sum;
       }, 0);
       
-      const netMonthly = monthlyIncome - monthlyExpenses;
+      const netMonthly = totalMonthlyIncome - monthlyExpenses;
       currentBalance += netMonthly;
       
       results.push({
         month: projectionDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }),
-        income: monthlyIncome,
+        income: totalMonthlyIncome,
         expense: monthlyExpenses,
         net: netMonthly,
         endBalance: currentBalance,
@@ -153,7 +125,7 @@ export default function ProjectionsPage() {
     }
 
     return results;
-  }, [monthsToProject, totalBalance, monthlyIncome, recurring]);
+  }, [monthsToProject, totalBalance, recurringIncomes, recurringExpenses]);
   
   if (authLoading || loading) {
      return (
@@ -161,7 +133,6 @@ export default function ProjectionsPage() {
          <div className="flex flex-col sm:flex-row items-center gap-4">
            <Skeleton className="h-8 w-72" />
            <div className="ml-auto flex flex-wrap items-center justify-end gap-4 w-full">
-              <Skeleton className="h-10 w-52" />
               <Skeleton className="h-10 w-44" />
            </div>
          </div>
@@ -184,17 +155,6 @@ export default function ProjectionsPage() {
         <h1 className="text-lg font-semibold md:text-2xl">Projeções Financeiras</h1>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-4 w-full">
             <div className="flex items-center gap-2">
-                <Label htmlFor="monthly-income" className="text-sm text-muted-foreground whitespace-nowrap">Receita Mensal (R$)</Label>
-                <Input 
-                    id="monthly-income"
-                    type="number"
-                    value={monthlyIncome}
-                    onChange={handleIncomeChange}
-                    className="w-[150px]"
-                    placeholder="Ex: 5000"
-                />
-            </div>
-            <div className="flex items-center gap-2">
                 <Label htmlFor="projection-months" className="text-sm text-muted-foreground">Projetar</Label>
                 <Select value={String(monthsToProject)} onValueChange={(value) => setMonthsToProject(Number(value))}>
                     <SelectTrigger id="projection-months" className="w-[120px]">
@@ -214,7 +174,7 @@ export default function ProjectionsPage() {
         <CardHeader>
           <CardTitle>Demonstração de Resultados Futuros (DRE)</CardTitle>
           <CardDescription>
-            Uma previsão dos seus resultados financeiros com base em despesas recorrentes e receitas fixas.
+            Uma previsão dos seus resultados financeiros com base em despesas e receitas recorrentes.
             Saldo Inicial: <strong>{formatCurrency(totalBalance)}</strong>
           </CardDescription>
         </CardHeader>
@@ -248,7 +208,7 @@ export default function ProjectionsPage() {
         </CardContent>
         <CardFooter>
             <p className="text-xs text-muted-foreground">
-                * Projeções são baseadas apenas nas contas recorrentes e receitas fixas cadastradas. A precisão pode variar.
+                * Projeções são baseadas apenas nas contas e receitas recorrentes cadastradas. A precisão pode variar.
             </p>
         </CardFooter>
       </Card>

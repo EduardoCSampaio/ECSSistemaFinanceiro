@@ -8,6 +8,9 @@ import {
 import { db } from "@/lib/firebase";
 import type { UserPreferences } from "@/lib/types";
 
+// This file is now unused as income is managed via recurring incomes.
+// It is kept for potential future user preferences.
+
 // Doc reference
 const getPreferencesDoc = (userId: string) => doc(db, `users/${userId}/preferences`, 'general');
 
