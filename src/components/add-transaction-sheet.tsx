@@ -38,8 +38,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { accounts, categories } from '@/lib/data';
-import type { Transaction } from '@/lib/types';
+import type { Transaction, Account, Category } from '@/lib/types';
 
 
 const transactionFormSchema = z.object({
@@ -60,9 +59,11 @@ type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 interface AddTransactionSheetProps {
     children: React.ReactNode;
     onSave: (data: TransactionFormValues) => void;
+    accounts: Account[];
+    categories: Category[];
 }
 
-export function AddTransactionSheet({ children, onSave }: AddTransactionSheetProps) {
+export function AddTransactionSheet({ children, onSave, accounts, categories }: AddTransactionSheetProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
@@ -77,6 +78,16 @@ export function AddTransactionSheet({ children, onSave }: AddTransactionSheetPro
       categoryId: ''
     },
   });
+
+  const transactionType = form.watch('type');
+
+  const filteredCategories = React.useMemo(() => {
+    if (transactionType === 'income') {
+        return categories.filter(c => ['Salário', 'Outras Receitas'].includes(c.name));
+    }
+    return categories.filter(c => !['Salário', 'Outras Receitas'].includes(c.name));
+  }, [categories, transactionType]);
+
 
   function onSubmit(data: TransactionFormValues) {
     onSave(data);
@@ -106,14 +117,12 @@ export function AddTransactionSheet({ children, onSave }: AddTransactionSheetPro
                 name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
+                    <FormControl>
                         <div className="grid grid-cols-2 gap-2">
-                           <Button type="button" variant={field.value === 'expense' ? 'default': 'outline'} onClick={() => field.onChange('expense')}>Despesa</Button>
-                           <Button type="button" variant={field.value === 'income' ? 'default': 'outline'} onClick={() => field.onChange('income')}>Receita</Button>
+                            <Button type="button" variant={field.value === 'expense' ? 'default': 'outline'} onClick={() => field.onChange('expense')}>Despesa</Button>
+                            <Button type="button" variant={field.value === 'income' ? 'default': 'outline'} onClick={() => field.onChange('income')}>Receita</Button>
                         </div>
-                      </FormControl>
-                    </Select>
+                    </FormControl>
                   </FormItem>
                 )}
               />
@@ -178,7 +187,7 @@ export function AddTransactionSheet({ children, onSave }: AddTransactionSheetPro
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+                            {filteredCategories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>

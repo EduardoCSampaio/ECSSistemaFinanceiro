@@ -32,7 +32,7 @@ import {
     DropdownMenuTrigger,
   } from "@/components/ui/dropdown-menu"
 import { Badge } from '@/components/ui/badge';
-import type { Transaction } from '@/lib/types';
+import type { Transaction, Account, Category } from '@/lib/types';
 import { AddTransactionSheet } from './add-transaction-sheet';
 import { cn } from '@/lib/utils';
 
@@ -90,9 +90,11 @@ export const columns: ColumnDef<Transaction>[] = [
 interface TransactionsDataTableProps {
   transactions: Transaction[];
   onAddTransaction: (data: Omit<Transaction, 'id' | 'account' | 'category'>) => void;
+  accounts: Account[];
+  categories: Category[];
 }
 
-export function TransactionsDataTable({ transactions, onAddTransaction }: TransactionsDataTableProps) {
+export function TransactionsDataTable({ transactions, onAddTransaction, accounts, categories }: TransactionsDataTableProps) {
   const [data, setData] = React.useState(() => [...transactions]);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -162,7 +164,7 @@ export function TransactionsDataTable({ transactions, onAddTransaction }: Transa
                 })}
             </DropdownMenuContent>
             </DropdownMenu>
-            <AddTransactionSheet onSave={onAddTransaction}>
+            <AddTransactionSheet onSave={onAddTransaction} accounts={accounts} categories={categories}>
                 <Button>
                 <PlusCircle className="mr-2 h-4 w-4" /> Nova Transação
                 </Button>
@@ -212,7 +214,7 @@ export function TransactionsDataTable({ transactions, onAddTransaction }: Transa
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  Nenhum resultado.
+                  Nenhuma transação encontrada. Adicione uma para começar.
                 </TableCell>
               </TableRow>
             )}

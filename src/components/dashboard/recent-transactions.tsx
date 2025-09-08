@@ -34,7 +34,7 @@ export function RecentTransactions() {
   useEffect(() => {
     const sorted = [...transactions].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 6);
     setRecentTransactions(sorted);
-  }, []);
+  }, [transactions]);
 
 
   return (
@@ -60,27 +60,28 @@ export function RecentTransactions() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {recentTransactions.length === 0 && (
+            {recentTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={2} className="h-24 text-center">
-                  Carregando transações...
+                  Nenhuma transação recente.
                 </TableCell>
               </TableRow>
+            ) : (
+              recentTransactions.map((transaction) => (
+                <TableRow key={transaction.id}>
+                  <TableCell>
+                    <div className="font-medium">{transaction.description}</div>
+                    <div className="text-sm text-muted-foreground">{transaction.category.name}</div>
+                  </TableCell>
+                  <TableCell className={cn(
+                    "text-right font-medium",
+                    transaction.type === 'income' ? 'text-emerald-500' : 'text-red-500'
+                  )}>
+                    {transaction.type === 'expense' ? '-' : ''}{formatCurrency(Math.abs(transaction.amount))}
+                  </TableCell>
+                </TableRow>
+              ))
             )}
-            {recentTransactions.map((transaction) => (
-              <TableRow key={transaction.id}>
-                <TableCell>
-                  <div className="font-medium">{transaction.description}</div>
-                  <div className="text-sm text-muted-foreground">{transaction.category.name}</div>
-                </TableCell>
-                <TableCell className={cn(
-                  "text-right font-medium",
-                  transaction.type === 'income' ? 'text-emerald-500' : 'text-red-500'
-                )}>
-                  {transaction.type === 'expense' ? '-' : ''}{formatCurrency(Math.abs(transaction.amount))}
-                </TableCell>
-              </TableRow>
-            ))}
           </TableBody>
         </Table>
       </CardContent>
