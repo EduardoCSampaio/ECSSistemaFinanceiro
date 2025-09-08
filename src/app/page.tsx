@@ -225,7 +225,7 @@ export default function AuthPage() {
                                     <FormItem>
                                     <FormLabel>E-mail</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="seu@email.com" {...field} />
+                                        <Input placeholder="seu@email.com" {...field} suppressHydrationWarning />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -238,7 +238,7 @@ export default function AuthPage() {
                                     <FormItem>
                                     <FormLabel>Senha</FormLabel>
                                     <FormControl>
-                                        <Input type="password" placeholder="******" {...field} />
+                                        <Input type="password" placeholder="******" {...field} suppressHydrationWarning />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -280,7 +280,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>CPF</FormLabel>
                           <FormControl>
-                            <Input placeholder="000.000.000-00" {...field} onChange={(e) => field.onChange(formatCpf(e.target.value))} />
+                            <Input placeholder="000.000.000-00" {...field} onChange={(e) => field.onChange(formatCpf(e.target.value))} suppressHydrationWarning />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -295,7 +295,7 @@ export default function AuthPage() {
                             <FormItem>
                             <FormLabel>CNPJ</FormLabel>
                             <FormControl>
-                                <Input placeholder="00.000.000/0000-00" {...field} onChange={(e) => field.onChange(formatCnpj(e.target.value))}/>
+                                <Input placeholder="00.000.000/0000-00" {...field} onChange={(e) => field.onChange(formatCnpj(e.target.value))} suppressHydrationWarning/>
                             </FormControl>
                             <FormMessage />
                             </FormItem>
@@ -309,7 +309,7 @@ export default function AuthPage() {
                       <FormItem>
                         <FormLabel>{personType === 'cpf' ? "Nome Completo" : "Razão Social"}</FormLabel>
                         <FormControl>
-                          <Input placeholder={personType === 'cpf' ? "Seu Nome Completo" : "Nome da sua Empresa"} {...field} />
+                          <Input placeholder={personType === 'cpf' ? "Seu Nome Completo" : "Nome da sua Empresa"} {...field} suppressHydrationWarning />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -322,7 +322,7 @@ export default function AuthPage() {
                       <FormItem>
                         <FormLabel>E-mail</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="seu@email.com" {...field} />
+                          <Input type="email" placeholder="seu@email.com" {...field} suppressHydrationWarning />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -336,7 +336,7 @@ export default function AuthPage() {
                         <FormItem>
                             <FormLabel>Senha</FormLabel>
                             <FormControl>
-                            <Input type="password" placeholder="******" {...field} />
+                            <Input type="password" placeholder="******" {...field} suppressHydrationWarning />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -349,7 +349,7 @@ export default function AuthPage() {
                         <FormItem>
                             <FormLabel>Confirmar Senha</FormLabel>
                             <FormControl>
-                            <Input type="password" placeholder="******" {...field} />
+                            <Input type="password" placeholder="******" {...field} suppressHydrationWarning />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
