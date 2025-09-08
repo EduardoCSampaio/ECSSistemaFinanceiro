@@ -23,15 +23,11 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
-  const recaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-  if (recaptchaKey) {
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(recaptchaKey),
-      isTokenAutoRefreshEnabled: true
-    });
-  } else {
-    console.warn("Firebase App Check: NEXT_PUBLIC_RECAPTCHA_SITE_KEY is not set in environment variables.");
-  }
+  // Pass the reCAPTCHA key directly to the provider
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider('6LdSpsIrAAAAAHw0CKUekCqq4GIMFZh1gwsFVoQG'),
+    isTokenAutoRefreshEnabled: true
+  });
 }
 
 

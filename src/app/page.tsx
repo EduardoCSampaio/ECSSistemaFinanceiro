@@ -401,19 +401,8 @@ function AuthPageComponent() {
 }
 
 export default function AuthPage() {
-    const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-    
-    if (!recaptchaSiteKey) {
-        return (
-            <div className="w-full max-w-md text-center">
-                <p className="text-destructive">A chave de site do reCAPTCHA não está configurada.</p>
-                <p className="text-muted-foreground text-sm">Por favor, adicione NEXT_PUBLIC_RECAPTCHA_SITE_KEY ao seu arquivo .env</p>
-            </div>
-        )
-    }
-    
     return (
-        <GoogleReCaptchaProvider reCaptchaKey={recaptchaSiteKey}>
+        <GoogleReCaptchaProvider reCaptchaKey="6LdSpsIrAAAAAHw0CKUekCqq4GIMFZh1gwsFVoQG">
             <AuthPageComponent />
         </GoogleReCaptchaProvider>
     );
