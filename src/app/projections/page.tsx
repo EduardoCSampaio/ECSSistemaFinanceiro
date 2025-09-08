@@ -27,7 +27,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { accounts, recurringTransactions } from '@/lib/data';
-import { addMonths, differenceInMonths } from 'date-fns';
+import { addMonths, startOfMonth, differenceInCalendarMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const formatCurrency = (value: number) => {
@@ -37,19 +37,20 @@ const formatCurrency = (value: number) => {
 export default function ProjectionsPage() {
   const [monthsToProject, setMonthsToProject] = useState(6);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
-  const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
+  const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), []);
 
   const projections = useMemo(() => {
     const results = [];
     let currentBalance = totalBalance;
+    const today = new Date();
 
-    for (let i = 1; i <= monthsToProject; i++) {
-      const projectionDate = addMonths(new Date(), i - 1);
+    for (let i = 0; i < monthsToProject; i++) {
+      const projectionDate = startOfMonth(addMonths(today, i));
 
       const monthlyExpenses = recurringTransactions.reduce((sum, transaction) => {
-        const startDate = new Date(transaction.startDate);
-        const monthsSinceStart = differenceInMonths(projectionDate, startDate);
-
+        const startDate = startOfMonth(new Date(transaction.startDate));
+        const monthsSinceStart = differenceInCalendarMonths(projectionDate, startDate);
+        
         if (monthsSinceStart >= 0) {
           if (transaction.installments !== null && monthsSinceStart >= transaction.installments) {
             return sum; 
@@ -59,14 +60,9 @@ export default function ProjectionsPage() {
         
         return sum;
       }, 0);
-
-      const netMonthly = monthlyIncome - monthlyExpenses;
       
-      if (i > 1) { 
-        currentBalance += netMonthly;
-      } else { 
-        currentBalance = totalBalance + netMonthly;
-      }
+      const netMonthly = monthlyIncome - monthlyExpenses;
+      currentBalance += netMonthly;
       
       results.push({
         month: projectionDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }),
