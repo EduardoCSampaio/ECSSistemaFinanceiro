@@ -19,8 +19,8 @@ export type Transaction = {
   type: 'income' | 'expense';
   category: Category;
   account: Account;
-  accountId?: string;
-  categoryId?: string;
+  accountId: string;
+  categoryId: string;
 };
 
 export type Budget = {
@@ -28,4 +28,5 @@ export type Budget = {
   category: Category;
   amount: number;
   spent: number;
+  categoryId?: string;
 };
