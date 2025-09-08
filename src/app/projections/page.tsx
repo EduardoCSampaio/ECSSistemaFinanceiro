@@ -26,7 +26,7 @@ import {
   TableCell
 } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-import { addMonths, startOfMonth, endOfMonth, differenceInCalendarMonths } from 'date-fns';
+import { addMonths, startOfMonth, endOfMonth, differenceInCalendarMonths, isBefore } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Account, RecurringTransaction, RecurringIncome, Transaction } from '@/lib/types';
 import { getAccounts } from '@/services/accounts';
@@ -105,16 +105,25 @@ export default function ProjectionsPage() {
       const projectionMonthEnd = endOfMonth(projectionDate);
 
       // --- Cálculos de Projeção ---
-      const monthlyProjectedExpenses = recurringExpenses.reduce((sum, transaction) => {
-        const startDate = startOfMonth(transaction.startDate.toDate());
-        const monthsSinceStart = differenceInCalendarMonths(projectionDate, startDate);
-
-        if (monthsSinceStart < 0) return sum; 
-        if (transaction.installments !== null) {
-          if (monthsSinceStart < transaction.installments) return sum + transaction.amount;
-        } else {
-           return sum + transaction.amount;
+      const monthlyProjectedExpenses = recurringExpenses.reduce((sum, expense) => {
+        const expenseStartDate = expense.startDate.toDate();
+        // A despesa só conta se o mês da projeção for igual ou depois do início dela.
+        if (isBefore(projectionDate, startOfMonth(expenseStartDate))) {
+            return sum;
         }
+
+        const monthsSinceStart = differenceInCalendarMonths(projectionDate, expenseStartDate);
+
+        // Se for fixa (sem parcelas), adiciona o valor.
+        if (expense.installments === null) {
+            return sum + expense.amount;
+        }
+
+        // Se for parcelada, verifica se a parcela atual ainda está válida.
+        if (monthsSinceStart >= 0 && monthsSinceStart < expense.installments) {
+            return sum + expense.amount;
+        }
+
         return sum;
       }, 0);
       
