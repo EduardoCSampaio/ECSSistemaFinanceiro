@@ -92,24 +92,30 @@ export default function ProjectionsPage() {
 
     const totalMonthlyIncome = recurringIncomes.reduce((sum, income) => sum + income.amount, 0);
 
-    for (let i = 0; i < monthsToProject; i++) {
+    // Start projection from the next month (i=1)
+    for (let i = 1; i <= monthsToProject; i++) {
       const projectionDate = startOfMonth(addMonths(today, i));
 
       const monthlyExpenses = recurringExpenses.reduce((sum, transaction) => {
         const startDate = startOfMonth(transaction.startDate.toDate());
-        const monthsSinceStart = Math.max(0, differenceInCalendarMonths(projectionDate, startDate));
+        // No need to adjust monthsSinceStart, as projectionDate is already in the future
+        const monthsSinceStart = differenceInCalendarMonths(projectionDate, startDate);
+
+        if (monthsSinceStart < 0) {
+            return sum; // Expense hasn't started yet
+        }
 
         if (transaction.installments !== null) {
+          // It's an installment plan
           if (monthsSinceStart < transaction.installments) {
             return sum + transaction.amount;
           }
         } else {
-           if (projectionDate >= startDate) {
-             return sum + transaction.amount;
-           }
+           // It's a fixed recurring expense
+           return sum + transaction.amount;
         }
         
-        return sum;
+        return sum; // Expense is over or hasn't started
       }, 0);
       
       const netMonthly = totalMonthlyIncome - monthlyExpenses;
