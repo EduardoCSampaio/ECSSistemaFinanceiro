@@ -48,3 +48,7 @@ export type RecurringTransaction = {
   categoryId: string;
   accountId: string;
 };
+
+export type UserPreferences = {
+    monthlyIncome?: number;
+}

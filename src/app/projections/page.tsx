@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import {
   Card,
@@ -32,34 +32,65 @@ import { cn } from '@/lib/utils';
 import type { Account, RecurringTransaction } from '@/lib/types';
 import { getAccounts } from '@/services/accounts';
 import { getRecurringTransactions } from '@/services/recurring';
+import { getPreferences, savePreferences } from '@/services/preferences';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
+
+// Debounce function
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<F>): void => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), waitFor);
+  };
+}
 
 export default function ProjectionsPage() {
   const { user, loading: authLoading } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   const [monthsToProject, setMonthsToProject] = useState(6);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
-  
-  useEffect(() => {
-    const savedIncome = localStorage.getItem('monthlyIncome');
-    if (savedIncome) {
-      setMonthlyIncome(Number(savedIncome));
-    }
-  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('monthlyIncome', String(monthlyIncome));
-  }, [monthlyIncome]);
+  // Function to save income to Firestore
+  const saveIncome = useCallback(async (income: number) => {
+      if (!user) return;
+      try {
+        await savePreferences(user.uid, { monthlyIncome: income });
+        toast({
+            title: 'Receita Salva',
+            description: 'Sua receita mensal foi atualizada com sucesso.',
+            duration: 2000,
+        });
+      } catch (error) {
+          console.error("Failed to save income:", error);
+           toast({
+            variant: "destructive",
+            title: 'Erro ao Salvar',
+            description: 'Não foi possível salvar sua receita mensal.',
+          });
+      }
+  }, [user, toast]);
+
+  // Create a debounced version of the save function
+  const debouncedSaveIncome = useCallback(debounce(saveIncome, 1500), [saveIncome]);
 
   useEffect(() => {
     if (user) {
+      // Fetch initial preferences
+      getPreferences(user.uid).then(prefs => {
+        if (prefs && prefs.monthlyIncome) {
+          setMonthlyIncome(prefs.monthlyIncome);
+        }
+      });
+      
       const unsubscribeAccounts = getAccounts(user.uid, (data) => {
         setAccounts(data);
         if(!recurring.length) setLoading(false);
@@ -75,6 +106,12 @@ export default function ProjectionsPage() {
       };
     }
   }, [user]);
+  
+  const handleIncomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newIncome = Number(e.target.value);
+      setMonthlyIncome(newIncome);
+      debouncedSaveIncome(newIncome);
+  }
 
   const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
@@ -152,7 +189,7 @@ export default function ProjectionsPage() {
                     id="monthly-income"
                     type="number"
                     value={monthlyIncome}
-                    onChange={(e) => setMonthlyIncome(Number(e.target.value))}
+                    onChange={handleIncomeChange}
                     className="w-[150px]"
                     placeholder="Ex: 5000"
                 />
