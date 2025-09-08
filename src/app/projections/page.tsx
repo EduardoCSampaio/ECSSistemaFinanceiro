@@ -91,11 +91,27 @@ export default function ProjectionsPage() {
     }
   }, [user]);
 
-  const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
+  const initialBalance = useMemo(() => {
+    const currentBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+    const today = new Date();
+    const startOfCurrentMonth = startOfMonth(today);
+
+    // Filter transactions from the beginning of the current month until today
+    const currentMonthTransactions = transactions.filter(t => t.date.toDate() >= startOfCurrentMonth);
+
+    // Calculate net change for the current month so far
+    const netChange = currentMonthTransactions.reduce((sum, t) => {
+        return t.type === 'income' ? sum + t.amount : sum - t.amount;
+    }, 0);
+
+    // To get the balance at the start of the month, we reverse the net change from the current balance
+    return currentBalance - netChange;
+  }, [accounts, transactions]);
+
 
   const projections = useMemo(() => {
     const results = [];
-    let currentBalance = totalBalance;
+    let currentBalance = initialBalance;
     const today = new Date();
 
     const totalMonthlyIncome = recurringIncomes.reduce((sum, income) => sum + income.amount, 0);
@@ -152,7 +168,7 @@ export default function ProjectionsPage() {
     }
 
     return results;
-  }, [monthsToProject, totalBalance, recurringIncomes, recurringExpenses, transactions]);
+  }, [monthsToProject, initialBalance, recurringIncomes, recurringExpenses, transactions]);
   
   if (authLoading || loading) {
      return (
@@ -202,7 +218,7 @@ export default function ProjectionsPage() {
           <CardTitle>Demonstração de Resultados (Previsto vs. Realizado)</CardTitle>
           <CardDescription>
             Compare suas finanças projetadas (recorrentes) com as transações reais de cada mês.
-            Saldo Inicial: <strong>{formatCurrency(totalBalance)}</strong>
+            Saldo Inicial (em 1º do Mês): <strong>{formatCurrency(initialBalance)}</strong>
           </CardDescription>
         </CardHeader>
         <CardContent>
