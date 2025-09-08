@@ -21,7 +21,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize App Check
+// Initialize App Check only on the client side
 if (typeof window !== 'undefined') {
   // Pass the reCAPTCHA key directly to the provider
   initializeAppCheck(app, {
@@ -29,7 +29,6 @@ if (typeof window !== 'undefined') {
     isTokenAutoRefreshEnabled: true
   });
 }
-
 
 const db = getFirestore(app);
 const auth = getAuth(app);
