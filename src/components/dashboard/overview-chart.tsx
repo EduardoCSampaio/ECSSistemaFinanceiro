@@ -1,6 +1,8 @@
+
 'use client';
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import { useMemo } from 'react';
 
 import {
   Card,
@@ -10,39 +12,41 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { transactions } from '@/lib/data';
-import { useEffect, useState } from 'react';
 
 const getMonthlyData = () => {
-  const data: { name: string; income: number; expense: number }[] = [];
+  const dataMap = new Map<string, { name: string; income: number; expense: number }>();
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
   sixMonthsAgo.setDate(1);
+  sixMonthsAgo.setHours(0, 0, 0, 0);
 
   for (let i = 0; i < 6; i++) {
-    const month = new Date(sixMonthsAgo);
-    month.setMonth(sixMonthsAgo.getMonth() + i);
-    
-    const monthName = month.toLocaleString('default', { month: 'short' });
-
-    const monthlyIncome = transactions
-      .filter(t => t.type === 'income' && t.date.getMonth() === month.getMonth() && t.date.getFullYear() === month.getFullYear())
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const monthlyExpense = transactions
-      .filter(t => t.type === 'expense' && t.date.getMonth() === month.getMonth() && t.date.getFullYear() === month.getFullYear())
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    data.push({ name: monthName, income: monthlyIncome, expense: monthlyExpense });
+    const monthDate = new Date(sixMonthsAgo);
+    monthDate.setMonth(sixMonthsAgo.getMonth() + i);
+    const monthName = monthDate.toLocaleString('default', { month: 'short' });
+    dataMap.set(monthName, { name: monthName, income: 0, expense: 0 });
   }
-  return data;
+
+  transactions.forEach(t => {
+    const transactionDate = new Date(t.date);
+    if (transactionDate >= sixMonthsAgo) {
+      const monthName = transactionDate.toLocaleString('default', { month: 'short' });
+      const monthData = dataMap.get(monthName);
+      if (monthData) {
+        if (t.type === 'income') {
+          monthData.income += t.amount;
+        } else {
+          monthData.expense += Math.abs(t.amount);
+        }
+      }
+    }
+  });
+
+  return Array.from(dataMap.values());
 };
 
 export function OverviewChart() {
-    const [data, setData] = useState<{ name: string; income: number; expense: number }[]>([]);
-
-    useEffect(() => {
-      setData(getMonthlyData());
-    }, []);
+    const data = useMemo(() => getMonthlyData(), [transactions]);
     
     if (!data.length) {
       return (
@@ -53,7 +57,7 @@ export function OverviewChart() {
             </CardHeader>
             <CardContent className="pl-2">
               <div className="w-full h-[350px] flex items-center justify-center">
-                <p>Carregando gráfico...</p>
+                <p className="text-muted-foreground">Sem dados para exibir.</p>
               </div>
             </CardContent>
         </Card>
@@ -88,6 +92,7 @@ export function OverviewChart() {
                             backgroundColor: 'hsl(var(--background))',
                             borderColor: 'hsl(var(--border))'
                         }}
+                        formatter={(value: number, name: string) => [formatCurrency(value), name === 'income' ? 'Receita' : 'Despesa']}
                     />
                     <Bar dataKey="income" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} name="Receita" />
                     <Bar dataKey="expense" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} name="Despesa"/>
@@ -96,4 +101,8 @@ export function OverviewChart() {
             </CardContent>
         </Card>
     )
+}
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }

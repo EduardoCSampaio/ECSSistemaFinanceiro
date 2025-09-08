@@ -1,7 +1,9 @@
+
 'use client';
 
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
+import { useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -20,7 +22,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { transactions } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
 import type { Transaction } from '@/lib/types';
 
 
@@ -29,11 +30,10 @@ const formatCurrency = (value: number) => {
 }
 
 export function RecentTransactions() {
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
-  
-  useEffect(() => {
-    const sorted = [...transactions].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 6);
-    setRecentTransactions(sorted);
+  const recentTransactions = useMemo(() => {
+    return [...transactions]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 6);
   }, [transactions]);
 
 
