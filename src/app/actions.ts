@@ -38,6 +38,11 @@ export async function signUp(data: any) {
 // The placeholder below won't work directly in a real server action without client token.
 export async function signIn(data: { token: string }) {
     try {
+        if (!process.env.RECAPTCHA_SECRET_KEY) {
+            console.error("RECAPTCHA_SECRET_KEY is not set");
+            return { success: false, error: "Configuração do servidor incompleta." };
+        }
+
         const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },

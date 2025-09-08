@@ -23,17 +23,19 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
+  // Pass the key directly from process.env
   const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+
   if (recaptchaSiteKey) {
     initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-      // Optional: set to true if you want to allow clients from browsers without App Check support.
       isTokenAutoRefreshEnabled: true
     });
   } else {
-    console.warn("Firebase App Check: reCAPTCHA site key not found in environment variables.");
+    console.warn("Firebase App Check: NEXT_PUBLIC_RECAPTCHA_SITE_KEY is not set in environment variables.");
   }
 }
+
 
 const db = getFirestore(app);
 const auth = getAuth(app);
