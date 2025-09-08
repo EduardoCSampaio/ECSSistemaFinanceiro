@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useAuth } from '@/hooks/use-auth';
 import {
   Card,
   CardContent,
@@ -26,19 +27,26 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { accounts, recurringTransactions } from '@/lib/data';
 import { addMonths, startOfMonth, differenceInCalendarMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
+import type { Account, RecurringTransaction } from '@/lib/types';
+import { getAccounts } from '@/services/accounts';
+import { getRecurringTransactions } from '@/services/recurring';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
 export default function ProjectionsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [monthsToProject, setMonthsToProject] = useState(6);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
-  const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), []);
-
+  
   useEffect(() => {
     const savedIncome = localStorage.getItem('monthlyIncome');
     if (savedIncome) {
@@ -50,6 +58,25 @@ export default function ProjectionsPage() {
     localStorage.setItem('monthlyIncome', String(monthlyIncome));
   }, [monthlyIncome]);
 
+  useEffect(() => {
+    if (user) {
+      const unsubscribeAccounts = getAccounts(user.uid, (data) => {
+        setAccounts(data);
+        if(!recurring.length) setLoading(false);
+      });
+      const unsubscribeRecurring = getRecurringTransactions(user.uid, (data) => {
+        setRecurring(data);
+        setLoading(false);
+      });
+
+      return () => {
+        unsubscribeAccounts();
+        unsubscribeRecurring();
+      };
+    }
+  }, [user]);
+
+  const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
   const projections = useMemo(() => {
     const results = [];
@@ -59,18 +86,15 @@ export default function ProjectionsPage() {
     for (let i = 0; i < monthsToProject; i++) {
       const projectionDate = startOfMonth(addMonths(today, i));
 
-      const monthlyExpenses = recurringTransactions.reduce((sum, transaction) => {
-        const startDate = startOfMonth(new Date(transaction.startDate));
-        // Garante que a comparação de meses seja sempre positiva ou zero
+      const monthlyExpenses = recurring.reduce((sum, transaction) => {
+        const startDate = startOfMonth(transaction.startDate.toDate());
         const monthsSinceStart = Math.max(0, differenceInCalendarMonths(projectionDate, startDate));
 
         if (transaction.installments !== null) {
-          // Se for parcelado, só entra no cálculo se a parcela atual estiver dentro do prazo
           if (monthsSinceStart < transaction.installments) {
             return sum + transaction.amount;
           }
         } else {
-          // Se for fixo, entra sempre no cálculo após a data de início
            if (projectionDate >= startDate) {
              return sum + transaction.amount;
            }
@@ -92,7 +116,30 @@ export default function ProjectionsPage() {
     }
 
     return results;
-  }, [monthsToProject, totalBalance, monthlyIncome]);
+  }, [monthsToProject, totalBalance, monthlyIncome, recurring]);
+  
+  if (authLoading || loading) {
+     return (
+       <div className="flex flex-1 flex-col gap-4 md:gap-8">
+         <div className="flex flex-col sm:flex-row items-center gap-4">
+           <Skeleton className="h-8 w-72" />
+           <div className="ml-auto flex flex-wrap items-center justify-end gap-4 w-full">
+              <Skeleton className="h-10 w-52" />
+              <Skeleton className="h-10 w-44" />
+           </div>
+         </div>
+         <Card>
+           <CardHeader>
+              <Skeleton className="h-6 w-80" />
+              <Skeleton className="h-4 w-96" />
+           </CardHeader>
+           <CardContent>
+             <Skeleton className="h-60 w-full" />
+           </CardContent>
+         </Card>
+       </div>
+     );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 md:gap-8">
