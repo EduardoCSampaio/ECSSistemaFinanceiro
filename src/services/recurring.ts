@@ -5,15 +5,16 @@ import {
     addDoc, 
     query, 
     onSnapshot,
-    Timestamp
+    Timestamp,
+    deleteDoc,
+    doc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { RecurringTransaction } from "@/lib/types";
 
-// Collection reference
-const getRecurringCollection = (userId: string) => {
-    return collection(db, `users/${userId}/recurring`);
-}
+// Collection and Doc references
+const getRecurringCollection = (userId: string) => collection(db, `users/${userId}/recurring`);
+const getRecurringDoc = (userId: string, docId: string) => doc(db, `users/${userId}/recurring`, docId);
 
 /**
  * Add a new recurring transaction to Firestore
@@ -33,6 +34,21 @@ export const addRecurringTransaction = async (userId: string, data: Omit<Recurri
         throw error;
     }
 };
+
+/**
+ * Delete a recurring transaction from Firestore
+ * @param userId - The ID of the user
+ * @param docId - The ID of the document to delete
+ */
+export const deleteRecurringTransaction = async (userId: string, docId: string) => {
+    try {
+        await deleteDoc(getRecurringDoc(userId, docId));
+    } catch (error) {
+        console.error("Error deleting recurring transaction:", error);
+        throw error;
+    }
+};
+
 
 /**
  * Get all recurring transactions for a user with real-time updates

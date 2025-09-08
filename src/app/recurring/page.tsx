@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -19,14 +19,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { AddRecurringSheet } from '@/components/add-recurring-sheet';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { categories } from '@/lib/data';
 import type { RecurringTransaction, Account } from '@/lib/types';
 import { differenceInMonths, format } from 'date-fns';
-import { getRecurringTransactions, addRecurringTransaction } from '@/services/recurring';
+import { getRecurringTransactions, addRecurringTransaction, deleteRecurringTransaction } from '@/services/recurring';
 import { getAccounts } from '@/services/accounts';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -37,6 +45,9 @@ export default function RecurringPage() {
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<RecurringTransaction | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
@@ -58,6 +69,30 @@ export default function RecurringPage() {
         await addRecurringTransaction(user.uid, newData);
     }
   };
+
+  const handleDelete = async () => {
+    if (!user || !itemToDelete) return;
+    try {
+        await deleteRecurringTransaction(user.uid, itemToDelete.id);
+        toast({
+            title: 'Despesa Excluída',
+            description: `A despesa "${itemToDelete.description}" foi removida.`,
+        });
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: 'Erro ao Excluir',
+            description: 'Não foi possível remover a despesa recorrente.',
+        });
+    }
+    setIsConfirmOpen(false);
+    setItemToDelete(null);
+  }
+
+  const openDeleteDialog = (item: RecurringTransaction) => {
+    setItemToDelete(item);
+    setIsConfirmOpen(true);
+  }
 
   const getInstallmentStatus = (item: RecurringTransaction) => {
     if (item.installments === null) {
@@ -125,7 +160,7 @@ export default function RecurringPage() {
                 <TableHead>Duração</TableHead>
                 <TableHead className="text-center">Dia do Vencimento</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="w-[140px]"></TableHead>
+                <TableHead className="w-[100px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -152,9 +187,23 @@ export default function RecurringPage() {
                         <TableCell className="text-center">{item.dayOfMonth}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(item.amount)}</TableCell>
                         <TableCell className="text-right">
-                            <Button variant="outline" size="sm" disabled>
-                               Registrar Pagamento
-                            </Button>
+                           <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem disabled>
+                                        <Pencil className="mr-2 h-4 w-4" />
+                                        Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openDeleteDialog(item)} className="text-destructive">
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Excluir
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     )
@@ -164,6 +213,13 @@ export default function RecurringPage() {
           </Table>
         </CardContent>
       </Card>
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleDelete}
+        title="Confirmar Exclusão"
+        description={`Tem certeza que deseja excluir a despesa recorrente "${itemToDelete?.description}"? Esta ação não pode ser desfeita.`}
+      />
     </div>
   );
 }
