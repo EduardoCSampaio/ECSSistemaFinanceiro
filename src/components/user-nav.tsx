@@ -39,13 +39,13 @@ export function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem>
-            <Link href="/auth">Perfil</Link>
+            Perfil
           </DropdownMenuItem>
           <DropdownMenuItem>Configurações</DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <Link href="/auth">Sair</Link>
+          <Link href="/">Sair</Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
