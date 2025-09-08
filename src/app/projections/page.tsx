@@ -24,6 +24,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { accounts, recurringTransactions } from '@/lib/data';
 import { addMonths, differenceInMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -34,6 +36,7 @@ const formatCurrency = (value: number) => {
 
 export default function ProjectionsPage() {
   const [monthsToProject, setMonthsToProject] = useState(6);
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
   const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
   const projections = useMemo(() => {
@@ -41,32 +44,27 @@ export default function ProjectionsPage() {
     let currentBalance = totalBalance;
 
     for (let i = 1; i <= monthsToProject; i++) {
-      const projectionDate = addMonths(new Date(), i-1);
+      const projectionDate = addMonths(new Date(), i - 1);
 
       const monthlyExpenses = recurringTransactions.reduce((sum, transaction) => {
         const startDate = new Date(transaction.startDate);
         const monthsSinceStart = differenceInMonths(projectionDate, startDate);
 
-        // A transação já começou?
         if (monthsSinceStart >= 0) {
-          // Se for parcelada, já acabou?
           if (transaction.installments !== null && monthsSinceStart >= transaction.installments) {
-            return sum; // Parcela já finalizou, não soma
+            return sum; 
           }
-          // Se for fixa ou parcela ativa, soma a despesa
           return sum + transaction.amount;
         }
         
-        return sum; // Transação ainda não começou
+        return sum;
       }, 0);
 
-      // Por enquanto, vamos assumir que não há receitas recorrentes cadastradas
-      const monthlyIncome = 0; 
       const netMonthly = monthlyIncome - monthlyExpenses;
       
-      if (i > 1) { // O saldo do primeiro mês já é calculado com o primeiro net
+      if (i > 1) { 
         currentBalance += netMonthly;
-      } else { // Para o primeiro mês, o saldo inicial é o total e o final é calculado
+      } else { 
         currentBalance = totalBalance + netMonthly;
       }
       
@@ -80,24 +78,37 @@ export default function ProjectionsPage() {
     }
 
     return results;
-  }, [monthsToProject, totalBalance]);
+  }, [monthsToProject, totalBalance, monthlyIncome]);
 
   return (
     <div className="flex flex-1 flex-col gap-4 md:gap-8">
-      <div className="flex items-center">
+      <div className="flex flex-col sm:flex-row items-center gap-4">
         <h1 className="text-lg font-semibold md:text-2xl">Projeções Financeiras</h1>
-        <div className="ml-auto flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Projetar para:</span>
-            <Select value={String(monthsToProject)} onValueChange={(value) => setMonthsToProject(Number(value))}>
-                <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="3">3 meses</SelectItem>
-                    <SelectItem value="6">6 meses</SelectItem>
-                    <SelectItem value="12">12 meses</SelectItem>
-                </SelectContent>
-            </Select>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-4 w-full">
+            <div className="flex items-center gap-2">
+                <Label htmlFor="monthly-income" className="text-sm text-muted-foreground whitespace-nowrap">Receita Mensal (R$)</Label>
+                <Input 
+                    id="monthly-income"
+                    type="number"
+                    value={monthlyIncome}
+                    onChange={(e) => setMonthlyIncome(Number(e.target.value))}
+                    className="w-[150px]"
+                    placeholder="Ex: 5000"
+                />
+            </div>
+            <div className="flex items-center gap-2">
+                <Label htmlFor="projection-months" className="text-sm text-muted-foreground">Projetar</Label>
+                <Select value={String(monthsToProject)} onValueChange={(value) => setMonthsToProject(Number(value))}>
+                    <SelectTrigger id="projection-months" className="w-[120px]">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="3">3 meses</SelectItem>
+                        <SelectItem value="6">6 meses</SelectItem>
+                        <SelectItem value="12">12 meses</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
         </div>
       </div>
       
@@ -105,7 +116,7 @@ export default function ProjectionsPage() {
         <CardHeader>
           <CardTitle>Demonstração de Resultados Futuros (DRE)</CardTitle>
           <CardDescription>
-            Uma previsão dos seus resultados financeiros com base em despesas recorrentes cadastradas.
+            Uma previsão dos seus resultados financeiros com base em despesas recorrentes e receitas fixas.
             Saldo Inicial: <strong>{formatCurrency(totalBalance)}</strong>
           </CardDescription>
         </CardHeader>
@@ -139,7 +150,7 @@ export default function ProjectionsPage() {
         </CardContent>
         <CardFooter>
             <p className="text-xs text-muted-foreground">
-                * Projeções são baseadas apenas nas contas recorrentes cadastradas. A precisão pode variar.
+                * Projeções são baseadas apenas nas contas recorrentes e receitas fixas cadastradas. A precisão pode variar.
             </p>
         </CardFooter>
       </Card>
