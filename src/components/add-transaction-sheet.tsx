@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useTransition, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { CalendarIcon, Sparkles } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import debounce from 'lodash.debounce';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +39,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { accounts, categories } from '@/lib/data';
-import { getCategorySuggestion } from '@/app/actions';
 
 const transactionFormSchema = z.object({
   description: z.string().min(2, {
@@ -59,9 +57,7 @@ type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 
 export function AddTransactionSheet({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
-  const [suggestion, setSuggestion] = useState('');
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -71,32 +67,6 @@ export function AddTransactionSheet({ children }: { children: React.ReactNode })
     },
   });
 
-  const fetchSuggestion = useCallback((description: string) => {
-    startTransition(async () => {
-      const result = await getCategorySuggestion(description);
-      if (result.suggestedCategory) {
-        const matchedCategory = categories.find(c => c.name.toLowerCase() === result.suggestedCategory.toLowerCase());
-        if (matchedCategory) {
-          setSuggestion(matchedCategory.id);
-        }
-      } else {
-        setSuggestion('');
-      }
-    });
-  }, []);
-  
-  const debouncedFetchSuggestion = useCallback(debounce(fetchSuggestion, 500), [fetchSuggestion]);
-
-
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === 'description' && value.description) {
-        debouncedFetchSuggestion(value.description);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form, debouncedFetchSuggestion]);
-
   function onSubmit(data: TransactionFormValues) {
     console.log(data);
     toast({
@@ -105,13 +75,6 @@ export function AddTransactionSheet({ children }: { children: React.ReactNode })
     });
     setOpen(false);
     form.reset();
-  }
-  
-  const handleSuggestionClick = () => {
-    if(suggestion) {
-        form.setValue('categoryId', suggestion);
-        setSuggestion('');
-    }
   }
 
   return (
@@ -207,11 +170,6 @@ export function AddTransactionSheet({ children }: { children: React.ReactNode })
                             {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        {suggestion && suggestion !== field.value && (
-                            <Button type="button" size="sm" variant="outline" className="absolute -top-4 right-0 text-xs h-6 px-2" onClick={handleSuggestionClick}>
-                                <Sparkles className="h-3 w-3 mr-1"/> Sugestão
-                            </Button>
-                        )}
                       </div>
                       <FormMessage />
                     </FormItem>
