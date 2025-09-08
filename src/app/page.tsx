@@ -252,7 +252,7 @@ function AuthPageComponent() {
                                     <FormItem>
                                     <FormLabel>E-mail</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="seu@email.com" {...field} suppressHydrationWarning />
+                                        <Input placeholder="seu@email.com" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -265,7 +265,7 @@ function AuthPageComponent() {
                                     <FormItem>
                                     <FormLabel>Senha</FormLabel>
                                     <FormControl>
-                                        <Input type="password" placeholder="******" {...field} suppressHydrationWarning />
+                                        <Input type="password" placeholder="******" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -309,7 +309,7 @@ function AuthPageComponent() {
                         <FormItem>
                           <FormLabel>CPF</FormLabel>
                           <FormControl>
-                            <Input placeholder="000.000.000-00" {...field} onChange={(e) => field.onChange(formatCpf(e.target.value))} suppressHydrationWarning />
+                            <Input placeholder="000.000.000-00" {...field} onChange={(e) => field.onChange(formatCpf(e.target.value))} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -324,7 +324,7 @@ function AuthPageComponent() {
                             <FormItem>
                             <FormLabel>CNPJ</FormLabel>
                             <FormControl>
-                                <Input placeholder="00.000.000/0000-00" {...field} onChange={(e) => field.onChange(formatCnpj(e.target.value))} suppressHydrationWarning/>
+                                <Input placeholder="00.000.000/0000-00" {...field} onChange={(e) => field.onChange(formatCnpj(e.target.value))} />
                             </FormControl>
                             <FormMessage />
                             </FormItem>
@@ -338,7 +338,7 @@ function AuthPageComponent() {
                       <FormItem>
                         <FormLabel>{personType === 'cpf' ? "Nome Completo" : "Razão Social"}</FormLabel>
                         <FormControl>
-                          <Input placeholder={personType === 'cpf' ? "Seu Nome Completo" : "Nome da sua Empresa"} {...field} suppressHydrationWarning />
+                          <Input placeholder={personType === 'cpf' ? "Seu Nome Completo" : "Nome da sua Empresa"} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -351,7 +351,7 @@ function AuthPageComponent() {
                       <FormItem>
                         <FormLabel>E-mail</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="seu@email.com" {...field} suppressHydrationWarning />
+                          <Input type="email" placeholder="seu@email.com" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -365,7 +365,7 @@ function AuthPageComponent() {
                         <FormItem>
                             <FormLabel>Senha</FormLabel>
                             <FormControl>
-                            <Input type="password" placeholder="******" {...field} suppressHydrationWarning />
+                            <Input type="password" placeholder="******" {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -378,7 +378,7 @@ function AuthPageComponent() {
                         <FormItem>
                             <FormLabel>Confirmar Senha</FormLabel>
                             <FormControl>
-                            <Input type="password" placeholder="******" {...field} suppressHydrationWarning />
+                            <Input type="password" placeholder="******" {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
