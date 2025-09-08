@@ -39,6 +39,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { accounts, categories } from '@/lib/data';
+import type { Transaction } from '@/lib/types';
+
 
 const transactionFormSchema = z.object({
   description: z.string().min(2, {
@@ -49,13 +51,18 @@ const transactionFormSchema = z.object({
   }),
   type: z.enum(['income', 'expense']),
   date: z.date(),
-  accountId: z.string(),
-  categoryId: z.string(),
+  accountId: z.string().min(1, { message: "Selecione uma conta."}),
+  categoryId: z.string().min(1, { message: "Selecione uma categoria."}),
 });
 
 type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 
-export function AddTransactionSheet({ children }: { children: React.ReactNode }) {
+interface AddTransactionSheetProps {
+    children: React.ReactNode;
+    onSave: (data: TransactionFormValues) => void;
+}
+
+export function AddTransactionSheet({ children, onSave }: AddTransactionSheetProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
@@ -64,11 +71,15 @@ export function AddTransactionSheet({ children }: { children: React.ReactNode })
     defaultValues: {
       type: 'expense',
       date: new Date(),
+      description: '',
+      amount: 0,
+      accountId: '',
+      categoryId: ''
     },
   });
 
   function onSubmit(data: TransactionFormValues) {
-    console.log(data);
+    onSave(data);
     toast({
       title: 'Transação Adicionada',
       description: `Sua transação "${data.description}" foi salva com sucesso.`,
@@ -126,7 +137,7 @@ export function AddTransactionSheet({ children }: { children: React.ReactNode })
                   <FormItem>
                     <FormLabel>Valor (R$)</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="1500.00" {...field} />
+                      <Input type="number" step="0.01" placeholder="1500.00" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

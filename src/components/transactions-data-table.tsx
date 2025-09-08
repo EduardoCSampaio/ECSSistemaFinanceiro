@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { PlusCircle, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { PlusCircle, SlidersHorizontal } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,7 +32,6 @@ import {
     DropdownMenuTrigger,
   } from "@/components/ui/dropdown-menu"
 import { Badge } from '@/components/ui/badge';
-import { transactions } from '@/lib/data';
 import type { Transaction } from '@/lib/types';
 import { AddTransactionSheet } from './add-transaction-sheet';
 import { cn } from '@/lib/utils';
@@ -88,11 +87,20 @@ export const columns: ColumnDef<Transaction>[] = [
   },
 ];
 
-export function TransactionsDataTable() {
-  const [data] = React.useState(() => [...transactions]);
+interface TransactionsDataTableProps {
+  transactions: Transaction[];
+  onAddTransaction: (data: Omit<Transaction, 'id' | 'account' | 'category'>) => void;
+}
+
+export function TransactionsDataTable({ transactions, onAddTransaction }: TransactionsDataTableProps) {
+  const [data, setData] = React.useState(() => [...transactions]);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+
+  React.useEffect(() => {
+    setData(transactions);
+  }, [transactions]);
 
   const table = useReactTable({
     data,
@@ -154,7 +162,7 @@ export function TransactionsDataTable() {
                 })}
             </DropdownMenuContent>
             </DropdownMenu>
-            <AddTransactionSheet>
+            <AddTransactionSheet onSave={onAddTransaction}>
                 <Button>
                 <PlusCircle className="mr-2 h-4 w-4" /> Nova Transação
                 </Button>

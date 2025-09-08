@@ -19,6 +19,8 @@ export type Transaction = {
   type: 'income' | 'expense';
   category: Category;
   account: Account;
+  accountId?: string;
+  categoryId?: string;
 };
 
 export type Budget = {
