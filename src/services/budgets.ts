@@ -9,7 +9,8 @@ import {
     where,
     doc,
     updateDoc,
-    deleteDoc
+    deleteDoc,
+    getDocs,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Budget, BudgetWithSpent, Transaction } from "@/lib/types";
@@ -26,6 +27,11 @@ const getTransactionsCollection = (userId: string) => collection(db, `users/${us
  */
 export const addBudget = async (userId: string, budgetData: Omit<Budget, 'id' | 'userId'>) => {
     try {
+        const existingBudgetQuery = query(getBudgetsCollection(userId), where("categoryId", "==", budgetData.categoryId));
+        const existingBudgetSnapshot = await getDocs(existingBudgetQuery);
+        if (!existingBudgetSnapshot.empty) {
+            throw new Error("Já existe um orçamento para esta categoria.");
+        }
         await addDoc(getBudgetsCollection(userId), budgetData);
     } catch (error) {
         console.error("Error adding budget:", error);

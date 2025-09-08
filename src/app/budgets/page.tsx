@@ -59,6 +59,7 @@ export default function BudgetsPage() {
     } else {
         await addBudget(user.uid, data);
     }
+    setBudgetToEdit(null);
   };
 
   const handleDeleteBudget = async () => {

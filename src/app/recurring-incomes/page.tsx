@@ -70,6 +70,7 @@ export default function RecurringIncomesPage() {
     } else {
       await addRecurringIncome(user.uid, data);
     }
+    setItemToEdit(null);
   };
 
   const handleDelete = async () => {
@@ -213,7 +214,7 @@ export default function RecurringIncomesPage() {
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleDelete}
         title="Confirmar Exclusão"
-        description={`Tem certeza que deseja excluir a receita recorrente "${itemToDelete?.description}"? Esta ação não pode ser desfeita.`}
+        description={`Tem certeza que deseja excluir la receita recorrente "${itemToDelete?.description}"? Esta ação não pode ser desfeita.`}
       />
     </div>
   );

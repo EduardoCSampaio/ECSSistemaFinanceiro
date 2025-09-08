@@ -52,7 +52,7 @@ type RecurringIncomeFormValues = z.infer<typeof recurringIncomeFormSchema>;
 interface AddRecurringIncomeSheetProps {
     isOpen: boolean;
     onSetOpen: (isOpen: boolean) => void;
-    onSave: (data: RecurringIncomeFormValues) => void;
+    onSave: (data: RecurringIncomeFormValues) => Promise<void>;
     itemToEdit?: RecurringIncome | null;
     accounts: Account[];
 }
@@ -72,9 +72,9 @@ export function AddRecurringIncomeSheet({ isOpen, onSetOpen, onSave, itemToEdit,
   });
 
   useEffect(() => {
-    if (itemToEdit) {
+    if (itemToEdit && isOpen) {
       form.reset(itemToEdit);
-    } else {
+    } else if (!isOpen) {
       form.reset({
         description: '',
         amount: 0,
@@ -85,13 +85,22 @@ export function AddRecurringIncomeSheet({ isOpen, onSetOpen, onSave, itemToEdit,
   }, [itemToEdit, form, isOpen]);
 
 
-  function onSubmit(data: RecurringIncomeFormValues) {
-    onSave(data);
-    toast({
-      title: isEditing ? 'Receita Atualizada' : 'Receita Adicionada',
-      description: `Sua receita "${data.description}" foi salva com sucesso.`,
-    });
-    onSetOpen(false);
+  async function onSubmit(data: RecurringIncomeFormValues) {
+    try {
+        await onSave(data);
+        toast({
+        title: isEditing ? 'Receita Atualizada' : 'Receita Adicionada',
+        description: `Sua receita "${data.description}" foi salva com sucesso.`,
+        });
+        onSetOpen(false);
+    } catch (error) {
+        console.error(error);
+        toast({
+            variant: "destructive",
+            title: 'Erro ao Salvar',
+            description: 'Não foi possível salvar a receita recorrente.',
+        });
+    }
   }
 
   return (

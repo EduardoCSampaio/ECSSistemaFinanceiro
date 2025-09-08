@@ -48,7 +48,7 @@ type BudgetFormValues = z.infer<typeof budgetFormSchema>;
 interface AddBudgetSheetProps {
     isOpen: boolean;
     onSetOpen: (isOpen: boolean) => void;
-    onSave: (data: BudgetFormValues) => void;
+    onSave: (data: BudgetFormValues) => Promise<void>;
     budgetToEdit?: Budget | null;
 }
 
@@ -61,27 +61,35 @@ export function AddBudgetSheet({ isOpen, onSetOpen, onSave, budgetToEdit }: AddB
   });
 
   useEffect(() => {
-    if (budgetToEdit) {
+    if (budgetToEdit && isOpen) {
         form.reset({
             amount: budgetToEdit.amount,
             categoryId: budgetToEdit.categoryId
         });
-    } else {
+    } else if (!isOpen) {
         form.reset({
             amount: 0,
             categoryId: ''
         });
     }
-  }, [budgetToEdit, form]);
+  }, [budgetToEdit, form, isOpen]);
 
-  function onSubmit(data: BudgetFormValues) {
-    onSave(data);
-    const categoryName = categories.find(c => c.id === data.categoryId)?.name;
-    toast({
-      title: isEditing ? 'Orçamento Atualizado' : 'Orçamento Criado',
-      description: `Seu orçamento para "${categoryName}" foi salvo com sucesso.`,
-    });
-    onSetOpen(false);
+  async function onSubmit(data: BudgetFormValues) {
+    try {
+        await onSave(data);
+        const categoryName = categories.find(c => c.id === data.categoryId)?.name;
+        toast({
+          title: isEditing ? 'Orçamento Atualizado' : 'Orçamento Criado',
+          description: `Seu orçamento para "${categoryName}" foi salvo com sucesso.`,
+        });
+        onSetOpen(false);
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: 'Erro ao Salvar',
+            description: 'Não foi possível salvar o orçamento.',
+        });
+    }
   }
 
   return (
