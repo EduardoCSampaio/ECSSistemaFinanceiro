@@ -37,6 +37,7 @@ export function RecentTransactions({ userId }: RecentTransactionsProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   useEffect(() => {
+    if (!userId) return;
     const unsubscribe = getTransactions(userId, setTransactions);
     return () => unsubscribe();
   }, [userId]);

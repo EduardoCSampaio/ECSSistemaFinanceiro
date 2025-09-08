@@ -21,6 +21,7 @@ export function SummaryCards({ userId }: SummaryCardsProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   useEffect(() => {
+    if (!userId) return;
     const unsubscribeAccounts = getAccounts(userId, setAccounts);
     const unsubscribeTransactions = getTransactions(userId, setTransactions);
     return () => {
