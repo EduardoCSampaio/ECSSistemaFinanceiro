@@ -3,6 +3,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 // Firebase configuration object is now hardcoded to prevent environment variable loading issues.
 // This is a public configuration and is safe to be exposed on the client-side.
@@ -19,6 +20,21 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Initialize App Check
+if (typeof window !== 'undefined') {
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+  if (recaptchaSiteKey) {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+      // Optional: set to true if you want to allow clients from browsers without App Check support.
+      isTokenAutoRefreshEnabled: true
+    });
+  } else {
+    console.warn("Firebase App Check: reCAPTCHA site key not found in environment variables.");
+  }
+}
+
 const db = getFirestore(app);
 const auth = getAuth(app);
 
