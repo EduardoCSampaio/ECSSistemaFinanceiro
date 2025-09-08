@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { AddRecurringSheet } from '@/components/add-recurring-sheet';
 import { accounts as initialAccounts, categories, recurringTransactions as initialRecurring } from '@/lib/data';
 import type { RecurringTransaction, Account } from '@/lib/types';
+import { differenceInMonths, format } from 'date-fns';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -50,6 +51,22 @@ export default function RecurringPage() {
       setRecurring(prev => [...prev, newRecurring]);
   };
 
+  const getInstallmentStatus = (item: RecurringTransaction) => {
+    if (item.installments === null) {
+      return 'Fixo';
+    }
+    const now = new Date();
+    const start = new Date(item.startDate);
+    const monthsPassed = differenceInMonths(now, start) + 1;
+    
+    if (monthsPassed > item.installments) {
+        return 'Finalizado';
+    }
+
+    return `${monthsPassed} de ${item.installments}`;
+  }
+
+
   return (
     <div className="flex flex-1 flex-col gap-4 md:gap-8">
       <div className="flex items-center">
@@ -67,8 +84,8 @@ export default function RecurringPage() {
       </div>
       <Card>
         <CardHeader>
-            <CardTitle>Lançamentos Fixos</CardTitle>
-            <CardDescription>Suas contas e despesas que se repetem todos os meses.</CardDescription>
+            <CardTitle>Lançamentos Fixos e Parcelados</CardTitle>
+            <CardDescription>Suas contas e despesas que se repetem.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -76,7 +93,7 @@ export default function RecurringPage() {
               <TableRow>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
-                <TableHead>Conta de Débito</TableHead>
+                <TableHead>Duração</TableHead>
                 <TableHead className="text-center">Dia do Vencimento</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead className="w-[140px]"></TableHead>
@@ -96,7 +113,11 @@ export default function RecurringPage() {
                     <TableCell>
                       <Badge variant="outline">{item.category.name}</Badge>
                     </TableCell>
-                    <TableCell>{item.account.name}</TableCell>
+                    <TableCell>
+                        <Badge variant={item.installments === null ? "secondary" : "default"}>
+                            {getInstallmentStatus(item)}
+                        </Badge>
+                    </TableCell>
                     <TableCell className="text-center">{item.dayOfMonth}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(item.amount)}</TableCell>
                     <TableCell className="text-right">

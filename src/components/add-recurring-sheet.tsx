@@ -4,9 +4,13 @@ import React, { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Form,
   FormControl,
@@ -32,7 +36,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import type { RecurringTransaction, Account, Category } from '@/lib/types';
 
 
@@ -44,15 +51,27 @@ const recurringFormSchema = z.object({
     message: 'O valor deve ser maior que zero.',
   }),
   dayOfMonth: z.coerce.number().min(1).max(31, { message: 'Dia inválido.'}),
+  startDate: z.date(),
+  isInstallment: z.boolean().default(false),
+  installments: z.coerce.number().optional(),
   accountId: z.string().min(1, { message: "Selecione uma conta."}),
   categoryId: z.string().min(1, { message: "Selecione uma categoria."}),
+}).refine(data => {
+    if (data.isInstallment) {
+        return data.installments && data.installments > 0;
+    }
+    return true;
+}, {
+    message: 'Número de parcelas deve ser maior que zero.',
+    path: ['installments']
 });
 
-type RecurringFormValues = z.infer<typeof recurringFormSchema>;
+type RecurringFormValues = Omit<RecurringTransaction, 'id' | 'account' | 'category'> & { isInstallment?: boolean };
+
 
 interface AddRecurringSheetProps {
     children: React.ReactNode;
-    onSave: (data: RecurringFormValues) => void;
+    onSave: (data: Omit<RecurringTransaction, 'id' | 'account' | 'category'>) => void;
     accounts: Account[];
     categories: Category[];
 }
@@ -61,24 +80,33 @@ export function AddRecurringSheet({ children, onSave, accounts, categories }: Ad
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  const form = useForm<RecurringFormValues>({
+  const form = useForm<z.infer<typeof recurringFormSchema>>({
     resolver: zodResolver(recurringFormSchema),
     defaultValues: {
       description: '',
       amount: 0,
-      dayOfMonth: 1,
+      dayOfMonth: new Date().getDate(),
+      startDate: new Date(),
+      isInstallment: false,
+      installments: 1,
       accountId: '',
       categoryId: ''
     },
   });
+
+  const isInstallment = form.watch('isInstallment');
 
   const expenseCategories = React.useMemo(() => {
     return categories.filter(c => !['Salário', 'Outras Receitas'].includes(c.name));
   }, [categories]);
 
 
-  function onSubmit(data: RecurringFormValues) {
-    onSave(data);
+  function onSubmit(data: z.infer<typeof recurringFormSchema>) {
+    const finalData = {
+        ...data,
+        installments: data.isInstallment ? data.installments! : null,
+    };
+    onSave(finalData);
     toast({
       title: 'Conta Recorrente Adicionada',
       description: `Sua conta "${data.description}" foi salva com sucesso.`,
@@ -101,7 +129,7 @@ export function AddRecurringSheet({ children, onSave, accounts, categories }: Ad
                 Preencha os detalhes de uma despesa que se repete mensalmente.
               </SheetDescription>
             </SheetHeader>
-            <div className="flex-1 space-y-4 py-4">
+            <div className="flex-1 space-y-4 py-4 overflow-y-auto pr-4">
               <FormField
                 control={form.control}
                 name="description"
@@ -187,6 +215,79 @@ export function AddRecurringSheet({ children, onSave, accounts, categories }: Ad
                   )}
                 />
               </div>
+               <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Data de Início</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={'outline'}
+                            className={cn(
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, 'PPP', { locale: ptBR })
+                            ) : (
+                              <span>Escolha uma data</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                          locale={ptBR}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="isInstallment"
+                render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                         <FormControl>
+                            <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                            />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                            <FormLabel>
+                                É uma compra parcelada?
+                            </FormLabel>
+                        </div>
+                    </FormItem>
+                )}
+                />
+                {isInstallment && (
+                    <FormField
+                        control={form.control}
+                        name="installments"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Número de Parcelas</FormLabel>
+                            <FormControl>
+                            <Input type="number" min="1" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                )}
             </div>
             <SheetFooter>
                 <SheetClose asChild>

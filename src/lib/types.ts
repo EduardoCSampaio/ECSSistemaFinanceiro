@@ -36,6 +36,8 @@ export type RecurringTransaction = {
   description: string;
   amount: number;
   dayOfMonth: number;
+  startDate: Date;
+  installments: number | null; // null for indefinite
   category: Category;
   categoryId: string;
   account: Account;
