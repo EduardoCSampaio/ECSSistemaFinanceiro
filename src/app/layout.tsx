@@ -34,7 +34,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                         <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
                             <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-primary">
                                 <Icons.logo className="h-6 w-6" />
-                                <span className="">Maestro Financeiro</span>
+                                <span className="">ECS Financial System</span>
                             </Link>
                         </div>
                         <div className="flex-1">

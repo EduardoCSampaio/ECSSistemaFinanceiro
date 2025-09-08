@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-    title: 'Autenticação - Maestro Financeiro',
+    title: 'Autenticação - ECS Financial System',
     description: 'Acesse ou crie sua conta.',
 };
 

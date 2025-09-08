@@ -201,7 +201,7 @@ export default function AuthPage() {
         <div className="text-center mb-6">
              <div className="flex items-center justify-center gap-2 font-semibold text-primary text-2xl">
                   <Icons.logo className="h-8 w-8" />
-                  <span className="">Maestro Financeiro</span>
+                  <span className="">ECS Financial System</span>
             </div>
         </div>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
