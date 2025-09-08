@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Menu } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { ThemeProvider } from 'next-themes';
 
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
@@ -78,9 +79,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
 function RootBody({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const { user, loading, router } = useAuth();
-    
-    // Redirect logic is now inside the useAuth hook
+    const { user, loading } = useAuth();
     
     if (loading) {
        return (
@@ -103,8 +102,6 @@ function RootBody({ children }: { children: React.ReactNode }) {
         return <AppLayout>{children}</AppLayout>;
     }
     
-    // Fallback for edge cases, e.g. navigating during auth state change
-    // Or when redirecting
     return (
         <div className="flex items-center justify-center min-h-screen">
              <div className="flex items-center gap-2 font-semibold text-primary text-2xl">
@@ -128,9 +125,16 @@ export default function RootLayout({
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn('font-body antialiased', 'bg-background text-foreground')}>
-        <AuthProvider>
-            <RootBody>{children}</RootBody>
-        </AuthProvider>
+        <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+        >
+            <AuthProvider>
+                <RootBody>{children}</RootBody>
+            </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -5,15 +5,17 @@ import { useAuth } from '@/hooks/use-auth';
 import { TransactionsDataTable } from "@/components/transactions-data-table";
 import { categories } from '@/lib/data';
 import type { Transaction, Account } from "@/lib/types";
-import { getTransactions, addTransaction } from "@/services/transactions";
+import { getTransactions, addTransaction, updateTransaction, deleteTransaction } from "@/services/transactions";
 import { getAccounts } from "@/services/accounts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 export default function TransactionsPage() {
   const { user, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
@@ -30,12 +32,27 @@ export default function TransactionsPage() {
     }
   }, [user]);
 
-
-  const handleAddTransaction = async (newTransactionData: Omit<Transaction, 'id' | 'userId'>) => {
-    if (user) {
-      await addTransaction(user.uid, newTransactionData);
-    }
+  const handleAddTransaction = async (data: Omit<Transaction, 'id' | 'userId'>) => {
+    if (!user) return;
+    await addTransaction(user.uid, data);
   };
+
+  const handleUpdateTransaction = async (id: string, data: Partial<Omit<Transaction, 'id' | 'userId'>>) => {
+      if(!user) return;
+      await updateTransaction(user.uid, id, data);
+  };
+  
+  const handleDeleteTransaction = async (id: string) => {
+      if(!user) return;
+      try {
+        await deleteTransaction(user.uid, id);
+        toast({ title: 'Transação Excluída', description: 'A transação foi removida com sucesso.' });
+      } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: 'Erro ao Excluir', description: 'Não foi possível remover a transação.' });
+      }
+  };
+
 
   if (authLoading || loading) {
     return (
@@ -62,6 +79,8 @@ export default function TransactionsPage() {
       <TransactionsDataTable 
         transactions={transactions} 
         onAddTransaction={handleAddTransaction}
+        onUpdateTransaction={handleUpdateTransaction}
+        onDeleteTransaction={handleDeleteTransaction}
         accounts={accounts}
         categories={categories}
       />

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -26,7 +26,6 @@ import {
   SheetTitle,
   SheetFooter,
   SheetClose,
-  SheetTrigger,
 } from '@/components/ui/sheet';
 import {
   Select,
@@ -58,60 +57,79 @@ const transactionFormSchema = z.object({
 type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 
 interface AddTransactionSheetProps {
-    children: React.ReactNode;
-    onSave: (data: TransactionFormValues) => void;
+    isOpen: boolean;
+    onSetOpen: (isOpen: boolean) => void;
+    onSave: (data: TransactionFormValues) => Promise<void>;
+    transactionToEdit?: Transaction | null;
     accounts: Account[];
     categories: Category[];
 }
 
-export function AddTransactionSheet({ children, onSave, accounts, categories }: AddTransactionSheetProps) {
-  const [open, setOpen] = useState(false);
+export function AddTransactionSheet({ isOpen, onSetOpen, onSave, transactionToEdit, accounts, categories }: AddTransactionSheetProps) {
   const { toast } = useToast();
+  const isEditing = !!transactionToEdit;
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
-    defaultValues: {
-      type: 'expense',
-      date: new Date(),
-      description: '',
-      amount: 0,
-      accountId: '',
-      categoryId: ''
-    },
   });
+  
+  useEffect(() => {
+    if (transactionToEdit) {
+      form.reset({
+        ...transactionToEdit,
+        date: transactionToEdit.date.toDate(),
+      });
+    } else {
+      form.reset({
+        type: 'expense',
+        date: new Date(),
+        description: '',
+        amount: 0,
+        accountId: '',
+        categoryId: ''
+      });
+    }
+  }, [transactionToEdit, form, isOpen]);
+
 
   const transactionType = form.watch('type');
 
   const filteredCategories = React.useMemo(() => {
+    const incomeCategoryNames = ['Salário', 'Outras Receitas'];
     if (transactionType === 'income') {
-        return categories.filter(c => ['Salário', 'Outras Receitas'].includes(c.name));
+        return categories.filter(c => incomeCategoryNames.includes(c.name));
     }
-    return categories.filter(c => !['Salário', 'Outras Receitas'].includes(c.name));
+    return categories.filter(c => !incomeCategoryNames.includes(c.name));
   }, [categories, transactionType]);
 
 
-  function onSubmit(data: TransactionFormValues) {
-    onSave(data);
-    toast({
-      title: 'Transação Adicionada',
-      description: `Sua transação "${data.description}" foi salva com sucesso.`,
-    });
-    setOpen(false);
-    form.reset();
+  async function onSubmit(data: TransactionFormValues) {
+    try {
+        await onSave(data);
+        toast({
+        title: isEditing ? 'Transação Atualizada' : 'Transação Adicionada',
+        description: `Sua transação "${data.description}" foi salva com sucesso.`,
+        });
+        onSetOpen(false);
+    } catch (error) {
+        console.error(error);
+        toast({
+            variant: "destructive",
+            title: 'Erro ao Salvar',
+            description: 'Ocorreu um problema ao salvar a transação.',
+        });
+    }
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        {children}
-      </SheetTrigger>
+    <Sheet open={isOpen} onOpenChange={onSetOpen}>
       <SheetContent className="sm:max-w-lg">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex h-full flex-col">
             <SheetHeader>
-              <SheetTitle>Adicionar Nova Transação</SheetTitle>
+              <SheetTitle>{isEditing ? 'Editar Transação' : 'Adicionar Nova Transação'}</SheetTitle>
               <SheetDescription>
-                Preencha os detalhes da sua movimentação financeira.
+                {isEditing ? 'Atualize os detalhes da sua movimentação.' : 'Preencha os detalhes da sua movimentação financeira.'}
               </SheetDescription>
             </SheetHeader>
             <div className="flex-1 space-y-4 py-4">
@@ -122,8 +140,8 @@ export function AddTransactionSheet({ children, onSave, accounts, categories }: 
                   <FormItem>
                     <FormControl>
                         <div className="grid grid-cols-2 gap-2">
-                            <Button type="button" variant={field.value === 'expense' ? 'default': 'outline'} onClick={() => field.onChange('expense')}>Despesa</Button>
-                            <Button type="button" variant={field.value === 'income' ? 'default': 'outline'} onClick={() => field.onChange('income')}>Receita</Button>
+                            <Button type="button" variant={field.value === 'expense' ? 'default': 'outline'} onClick={() => { field.onChange('expense'); form.setValue('categoryId', '') }}>Despesa</Button>
+                            <Button type="button" variant={field.value === 'income' ? 'default': 'outline'} onClick={() => { field.onChange('income'); form.setValue('categoryId', '') }}>Receita</Button>
                         </div>
                     </FormControl>
                   </FormItem>
@@ -162,7 +180,7 @@ export function AddTransactionSheet({ children, onSave, accounts, categories }: 
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Conta</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione uma conta" />
@@ -244,7 +262,7 @@ export function AddTransactionSheet({ children, onSave, accounts, categories }: 
             </div>
             <SheetFooter>
                 <SheetClose asChild>
-                    <Button type="button" variant="outline">Cancelar</Button>
+                    <Button type="button" variant="outline" onClick={() => onSetOpen(false)}>Cancelar</Button>
                 </SheetClose>
                 <Button type="submit">Salvar Transação</Button>
             </SheetFooter>

@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { PlusCircle, SlidersHorizontal } from 'lucide-react';
+import { PlusCircle, SlidersHorizontal, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,14 +26,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-  } from "@/components/ui/dropdown-menu"
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import type { Transaction, Account, Category } from '@/lib/types';
 import { AddTransactionSheet } from './add-transaction-sheet';
+import { ConfirmDialog } from './confirm-dialog';
 import { cn } from '@/lib/utils';
 
 
@@ -45,71 +48,144 @@ const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('pt-BR').format(date);
 }
 
-export const columns: ColumnDef<Transaction>[] = [
-  {
-    accessorKey: 'date',
-    header: 'Data',
-    cell: ({ row }) => {
-        const date = row.getValue('date') as any;
-        return formatDate(date.toDate()); // Firestore timestamp to Date
-    },
-  },
-  {
-    accessorKey: 'description',
-    header: 'Descrição',
-  },
-  {
-    accessorKey: 'categoryId',
-    header: 'Categoria',
-    cell: ({ row, table }) => {
-        const { categories } = table.options.meta as any;
-        const categoryId = row.getValue('categoryId');
-        const category = categories.find((c: Category) => c.id === categoryId);
-        return <Badge variant="outline">{category?.name || 'N/A'}</Badge>
-    },
-    filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-    },
-  },
-  {
-    accessorKey: 'accountId',
-    header: 'Conta',
-    cell: ({ row, table }) => {
-        const { accounts } = table.options.meta as any;
-        const accountId = row.getValue('accountId');
-        const account = accounts.find((a: Account) => a.id === accountId);
-        return account?.name || 'N/A';
-    },
-  },
-  {
-    accessorKey: 'amount',
-    header: () => <div className="text-right">Valor</div>,
-    cell: ({ row }) => {
-        const amount = parseFloat(row.getValue('amount'));
-        const type = row.original.type;
-        const formatted = formatCurrency(Math.abs(amount));
-
-        return <div className={cn("text-right font-medium", type === 'income' ? 'text-emerald-500' : 'text-red-500')}>{type === 'expense' ? '-' : ''}{formatted}</div>;
-    },
-  },
-];
-
 interface TransactionsDataTableProps {
   transactions: Transaction[];
-  onAddTransaction: (data: Omit<Transaction, 'id' | 'userId'>) => void;
+  onAddTransaction: (data: Omit<Transaction, 'id' | 'userId'>) => Promise<void>;
+  onUpdateTransaction: (id: string, data: Partial<Omit<Transaction, 'id' | 'userId'>>) => Promise<void>;
+  onDeleteTransaction: (id: string) => Promise<void>;
   accounts: Account[];
   categories: Category[];
 }
 
-export function TransactionsDataTable({ transactions, onAddTransaction, accounts, categories }: TransactionsDataTableProps) {
+export function TransactionsDataTable({ 
+    transactions, 
+    onAddTransaction, 
+    onUpdateTransaction,
+    onDeleteTransaction,
+    accounts, 
+    categories 
+}: TransactionsDataTableProps) {
   const [data, setData] = React.useState(() => [...transactions]);
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: 'date', desc: true }
+  ]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  
+  const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const [transactionToEdit, setTransactionToEdit] = React.useState<Transaction | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
+  const [transactionToDelete, setTransactionToDelete] = React.useState<Transaction | null>(null);
 
   React.useEffect(() => {
     setData(transactions);
   }, [transactions]);
+
+  const openEditSheet = (transaction: Transaction) => {
+    setTransactionToEdit(transaction);
+    setIsSheetOpen(true);
+  };
+
+  const openAddSheet = () => {
+    setTransactionToEdit(null);
+    setIsSheetOpen(true);
+  };
+  
+  const openDeleteDialog = (transaction: Transaction) => {
+    setTransactionToDelete(transaction);
+    setIsConfirmOpen(true);
+  };
+  
+  const handleSave = async (values: Omit<Transaction, 'id' | 'userId'>) => {
+      if (transactionToEdit) {
+          await onUpdateTransaction(transactionToEdit.id, values);
+      } else {
+          await onAddTransaction(values);
+      }
+      setIsSheetOpen(false);
+      setTransactionToEdit(null);
+  };
+
+  const handleDelete = async () => {
+      if(transactionToDelete) {
+        await onDeleteTransaction(transactionToDelete.id);
+        setIsConfirmOpen(false);
+        setTransactionToDelete(null);
+      }
+  }
+
+ const columns: ColumnDef<Transaction>[] = [
+    {
+        accessorKey: 'date',
+        header: 'Data',
+        cell: ({ row }) => {
+            const date = row.getValue('date') as any;
+            return formatDate(date.toDate()); // Firestore timestamp to Date
+        },
+    },
+    {
+        accessorKey: 'description',
+        header: 'Descrição',
+    },
+    {
+        accessorKey: 'categoryId',
+        header: 'Categoria',
+        cell: ({ row }) => {
+            const categoryId = row.getValue('categoryId');
+            const category = categories.find((c: Category) => c.id === categoryId);
+            return <Badge variant="outline">{category?.name || 'N/A'}</Badge>
+        },
+        filterFn: (row, id, value) => {
+            return value.includes(row.getValue(id))
+        },
+    },
+    {
+        accessorKey: 'accountId',
+        header: 'Conta',
+        cell: ({ row }) => {
+            const accountId = row.getValue('accountId');
+            const account = accounts.find((a: Account) => a.id === accountId);
+            return account?.name || 'N/A';
+        },
+    },
+    {
+        accessorKey: 'amount',
+        header: () => <div className="text-right">Valor</div>,
+        cell: ({ row }) => {
+            const amount = parseFloat(row.getValue('amount'));
+            const type = row.original.type;
+            const formatted = formatCurrency(Math.abs(amount));
+
+            return <div className={cn("text-right font-medium", type === 'income' ? 'text-emerald-500' : 'text-red-500')}>{type === 'expense' ? '-' : ''}{formatted}</div>;
+        },
+    },
+    {
+        id: 'actions',
+        cell: ({ row }) => {
+          const transaction = row.original;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Abrir menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => openEditSheet(transaction)}>
+                  <Pencil className="mr-2 h-4 w-4" /> Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openDeleteDialog(transaction)} className="text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      },
+];
+
 
   const table = useReactTable({
     data,
@@ -160,7 +236,6 @@ export function TransactionsDataTable({ transactions, onAddTransaction, accounts
                 .getAllColumns()
                 .filter((column) => column.getCanHide())
                 .map((column) => {
-                    // Map column IDs to Portuguese labels
                     const columnLabels: { [key: string]: string } = {
                         date: 'Data',
                         description: 'Descrição',
@@ -183,11 +258,9 @@ export function TransactionsDataTable({ transactions, onAddTransaction, accounts
                 })}
             </DropdownMenuContent>
             </DropdownMenu>
-            <AddTransactionSheet onSave={onAddTransaction} accounts={accounts} categories={categories}>
-                <Button>
+            <Button onClick={openAddSheet}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Nova Transação
-                </Button>
-            </AddTransactionSheet>
+            </Button>
         </div>
       </div>
       <div className="rounded-md border">
@@ -263,6 +336,22 @@ export function TransactionsDataTable({ transactions, onAddTransaction, accounts
           </Button>
         </div>
       </div>
+       <AddTransactionSheet 
+        key={transactionToEdit ? transactionToEdit.id : 'new'}
+        isOpen={isSheetOpen}
+        onSetOpen={setIsSheetOpen}
+        onSave={handleSave} 
+        transactionToEdit={transactionToEdit}
+        accounts={accounts} 
+        categories={categories}
+      />
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleDelete}
+        title="Confirmar Exclusão"
+        description={`Tem certeza que deseja excluir a transação "${transactionToDelete?.description}"? Esta ação não pode ser desfeita.`}
+      />
     </div>
   );
 }

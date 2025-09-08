@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuth, signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { User, LogOut } from 'lucide-react';
+import { User, LogOut, Monitor, Moon, Sun, Settings } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 import {
   Avatar,
@@ -20,11 +21,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSubContent
 } from '@/components/ui/dropdown-menu';
 
 export function UserNav() {
   const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const { setTheme } = useTheme();
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -68,9 +74,31 @@ export function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem>
-            Perfil
+            <User className="mr-2 h-4 w-4" />
+            <span>Perfil</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>Configurações</DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Tema</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem onClick={() => setTheme('light')}>
+                  <Sun className="mr-2 h-4 w-4" />
+                  <span>Claro</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('dark')}>
+                  <Moon className="mr-2 h-4 w-4" />
+                  <span>Escuro</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('system')}>
+                  <Monitor className="mr-2 h-4 w-4" />
+                  <span>Sistema</span>
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
