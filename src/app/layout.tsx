@@ -111,6 +111,23 @@ function RootBody({ children }: { children: React.ReactNode }) {
     );
 }
 
+const faviconSvg = `
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+  <path d="M2 17l10 5 10-5"></path>
+  <path d="M2 12l10 5 10-5"></path>
+</svg>
+`;
+
+const faviconUri = `data:image/svg+xml;base64,${btoa(faviconSvg)}`;
 
 export default function RootLayout({
   children,
@@ -120,6 +137,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+          <title>ECS Financial System</title>
+          <meta name="description" content="Seu sistema financeiro completo." />
+          <link rel="icon" href={faviconUri} type="image/svg+xml" />
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
