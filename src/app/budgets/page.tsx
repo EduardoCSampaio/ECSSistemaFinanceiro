@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { AlertCircle, PlusCircle, Target } from 'lucide-react';
+import { AlertCircle, PlusCircle, Target, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,12 +12,21 @@ import {
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { categories } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { AddBudgetSheet } from '@/components/add-budget-sheet';
 import type { Budget, BudgetWithSpent } from '@/lib/types';
-import { getBudgetsWithSpent, addBudget } from '@/services/budgets';
+import { getBudgetsWithSpent, addBudget, updateBudget, deleteBudget } from '@/services/budgets';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { useToast } from '@/hooks/use-toast';
+
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -27,6 +36,11 @@ export default function BudgetsPage() {
   const { user, loading: authLoading } = useAuth();
   const [budgets, setBudgets] = useState<BudgetWithSpent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [budgetToEdit, setBudgetToEdit] = useState<Budget | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
@@ -38,11 +52,49 @@ export default function BudgetsPage() {
     }
   }, [user]);
 
-  const handleAddBudget = async (newBudgetData: Omit<Budget, 'id' | 'userId'>) => {
-    if (user) {
-      await addBudget(user.uid, newBudgetData);
+  const handleSaveBudget = async (data: Omit<Budget, 'id' | 'userId'>) => {
+    if (!user) return;
+    if (budgetToEdit) {
+        await updateBudget(user.uid, budgetToEdit.id, data);
+    } else {
+        await addBudget(user.uid, data);
     }
   };
+
+  const handleDeleteBudget = async () => {
+    if (!user || !budgetToDelete) return;
+    try {
+        await deleteBudget(user.uid, budgetToDelete.id);
+        const categoryName = categories.find(c => c.id === budgetToDelete.categoryId)?.name;
+        toast({
+            title: 'Orçamento Excluído',
+            description: `O orçamento para "${categoryName}" foi removido.`,
+        });
+    } catch (error) {
+         toast({
+            variant: "destructive",
+            title: 'Erro ao Excluir',
+            description: 'Não foi possível remover o orçamento.',
+        });
+    }
+    setIsConfirmOpen(false);
+    setBudgetToDelete(null);
+  };
+
+  const openAddSheet = () => {
+    setBudgetToEdit(null);
+    setIsSheetOpen(true);
+  };
+
+  const openEditSheet = (budget: Budget) => {
+    setBudgetToEdit(budget);
+    setIsSheetOpen(true);
+  };
+
+  const openDeleteDialog = (budget: Budget) => {
+    setBudgetToDelete(budget);
+    setIsConfirmOpen(true);
+  }
 
   if (authLoading || loading) {
      return (
@@ -67,14 +119,12 @@ export default function BudgetsPage() {
       <div className="flex items-center">
         <h1 className="text-lg font-semibold md:text-2xl">Orçamentos</h1>
         <div className="ml-auto flex items-center gap-2">
-          <AddBudgetSheet onSave={handleAddBudget}>
-            <Button size="sm" className="h-8 gap-1">
-              <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Novo Orçamento
-              </span>
-            </Button>
-          </AddBudgetSheet>
+          <Button size="sm" className="h-8 gap-1" onClick={openAddSheet}>
+            <PlusCircle className="h-3.5 w-3.5" />
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+              Novo Orçamento
+            </span>
+          </Button>
         </div>
       </div>
        {budgets.length === 0 ? (
@@ -92,14 +142,30 @@ export default function BudgetsPage() {
 
             return (
               <Card key={budget.id}>
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-medium flex items-center gap-2">
-                      {category?.icon && <category.icon className="h-5 w-5 text-muted-foreground" />}
-                      {category?.name || 'Categoria'}
-                    </CardTitle>
-                    <Target className="h-5 w-5 text-muted-foreground" />
+                <CardHeader className="pb-4 flex-row items-start justify-between">
+                  <div className="flex items-center gap-2">
+                     {category?.icon && <category.icon className="h-5 w-5 text-muted-foreground" />}
+                     <CardTitle className="text-base font-medium">
+                        {category?.name || 'Categoria'}
+                     </CardTitle>
                   </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                            <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditSheet(budget)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openDeleteDialog(budget)} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4">
                   <div>
@@ -123,6 +189,20 @@ export default function BudgetsPage() {
           })}
         </div>
       )}
+       <AddBudgetSheet 
+          key={budgetToEdit ? budgetToEdit.id : 'add'}
+          isOpen={isSheetOpen}
+          onSetOpen={setIsSheetOpen}
+          onSave={handleSaveBudget} 
+          budgetToEdit={budgetToEdit}
+        />
+        <ConfirmDialog
+            isOpen={isConfirmOpen}
+            onClose={() => setIsConfirmOpen(false)}
+            onConfirm={handleDeleteBudget}
+            title="Confirmar Exclusão"
+            description={`Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.`}
+        />
     </div>
   );
 }

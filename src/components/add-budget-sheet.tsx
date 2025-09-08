@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -23,7 +23,6 @@ import {
   SheetTitle,
   SheetFooter,
   SheetClose,
-  SheetTrigger,
 } from '@/components/ui/sheet';
 import {
   Select,
@@ -47,45 +46,53 @@ const budgetFormSchema = z.object({
 type BudgetFormValues = z.infer<typeof budgetFormSchema>;
 
 interface AddBudgetSheetProps {
-    children: React.ReactNode;
+    isOpen: boolean;
+    onSetOpen: (isOpen: boolean) => void;
     onSave: (data: BudgetFormValues) => void;
+    budgetToEdit?: Budget | null;
 }
 
-export function AddBudgetSheet({ children, onSave }: AddBudgetSheetProps) {
-  const [open, setOpen] = useState(false);
+export function AddBudgetSheet({ isOpen, onSetOpen, onSave, budgetToEdit }: AddBudgetSheetProps) {
   const { toast } = useToast();
+  const isEditing = !!budgetToEdit;
 
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetFormSchema),
-    defaultValues: {
-      amount: 0,
-      categoryId: ''
-    },
   });
+
+  useEffect(() => {
+    if (budgetToEdit) {
+        form.reset({
+            amount: budgetToEdit.amount,
+            categoryId: budgetToEdit.categoryId
+        });
+    } else {
+        form.reset({
+            amount: 0,
+            categoryId: ''
+        });
+    }
+  }, [budgetToEdit, form]);
 
   function onSubmit(data: BudgetFormValues) {
     onSave(data);
     const categoryName = categories.find(c => c.id === data.categoryId)?.name;
     toast({
-      title: 'Orçamento Criado',
-      description: `Seu orçamento para "${categoryName}" foi criado com sucesso.`,
+      title: isEditing ? 'Orçamento Atualizado' : 'Orçamento Criado',
+      description: `Seu orçamento para "${categoryName}" foi salvo com sucesso.`,
     });
-    setOpen(false);
-    form.reset();
+    onSetOpen(false);
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        {children}
-      </SheetTrigger>
+    <Sheet open={isOpen} onOpenChange={onSetOpen}>
       <SheetContent className="sm:max-w-lg">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex h-full flex-col">
             <SheetHeader>
-              <SheetTitle>Criar Novo Orçamento</SheetTitle>
+              <SheetTitle>{isEditing ? 'Editar Orçamento' : 'Criar Novo Orçamento'}</SheetTitle>
               <SheetDescription>
-                Defina um limite de gastos para uma categoria.
+                {isEditing ? 'Atualize o limite de gastos para esta categoria.' : 'Defina um limite de gastos para uma categoria.'}
               </SheetDescription>
             </SheetHeader>
             <div className="flex-1 space-y-4 py-4">
@@ -96,7 +103,7 @@ export function AddBudgetSheet({ children, onSave }: AddBudgetSheetProps) {
                     <FormItem>
                       <FormLabel>Categoria</FormLabel>
                       <div className="relative">
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isEditing}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione uma categoria" />
@@ -127,9 +134,9 @@ export function AddBudgetSheet({ children, onSave }: AddBudgetSheetProps) {
             </div>
             <SheetFooter>
                 <SheetClose asChild>
-                    <Button type="button" variant="outline">Cancelar</Button>
+                    <Button type="button" variant="outline" onClick={() => onSetOpen(false)}>Cancelar</Button>
                 </SheetClose>
-                <Button type="submit">Salvar Orçamento</Button>
+                <Button type="submit">Salvar Alterações</Button>
             </SheetFooter>
           </form>
         </Form>

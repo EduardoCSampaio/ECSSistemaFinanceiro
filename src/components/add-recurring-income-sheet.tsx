@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -23,7 +23,6 @@ import {
   SheetTitle,
   SheetFooter,
   SheetClose,
-  SheetTrigger,
 } from '@/components/ui/sheet';
 import {
   Select,
@@ -47,18 +46,22 @@ const recurringIncomeFormSchema = z.object({
   accountId: z.string().min(1, { message: "Selecione uma conta."}),
 });
 
+type RecurringIncomeFormValues = z.infer<typeof recurringIncomeFormSchema>;
+
 
 interface AddRecurringIncomeSheetProps {
-    children: React.ReactNode;
-    onSave: (data: Omit<RecurringIncome, 'id' | 'userId'>) => void;
+    isOpen: boolean;
+    onSetOpen: (isOpen: boolean) => void;
+    onSave: (data: RecurringIncomeFormValues) => void;
+    itemToEdit?: RecurringIncome | null;
     accounts: Account[];
 }
 
-export function AddRecurringIncomeSheet({ children, onSave, accounts }: AddRecurringIncomeSheetProps) {
-  const [open, setOpen] = useState(false);
+export function AddRecurringIncomeSheet({ isOpen, onSetOpen, onSave, itemToEdit, accounts }: AddRecurringIncomeSheetProps) {
   const { toast } = useToast();
+  const isEditing = !!itemToEdit;
 
-  const form = useForm<z.infer<typeof recurringIncomeFormSchema>>({
+  const form = useForm<RecurringIncomeFormValues>({
     resolver: zodResolver(recurringIncomeFormSchema),
     defaultValues: {
       description: '',
@@ -68,28 +71,38 @@ export function AddRecurringIncomeSheet({ children, onSave, accounts }: AddRecur
     },
   });
 
-  function onSubmit(data: z.infer<typeof recurringIncomeFormSchema>) {
+  useEffect(() => {
+    if (itemToEdit) {
+      form.reset(itemToEdit);
+    } else {
+      form.reset({
+        description: '',
+        amount: 0,
+        dayOfMonth: new Date().getDate(),
+        accountId: ''
+      });
+    }
+  }, [itemToEdit, form, isOpen]);
+
+
+  function onSubmit(data: RecurringIncomeFormValues) {
     onSave(data);
     toast({
-      title: 'Receita Recorrente Adicionada',
+      title: isEditing ? 'Receita Atualizada' : 'Receita Adicionada',
       description: `Sua receita "${data.description}" foi salva com sucesso.`,
     });
-    setOpen(false);
-    form.reset();
+    onSetOpen(false);
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        {children}
-      </SheetTrigger>
+    <Sheet open={isOpen} onOpenChange={onSetOpen}>
       <SheetContent className="sm:max-w-lg">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex h-full flex-col">
             <SheetHeader>
-              <SheetTitle>Adicionar Receita Recorrente</SheetTitle>
+              <SheetTitle>{isEditing ? 'Editar Receita Recorrente' : 'Adicionar Receita Recorrente'}</SheetTitle>
               <SheetDescription>
-                Preencha os detalhes de uma fonte de renda que se repete mensalmente.
+                {isEditing ? 'Atualize os detalhes da sua receita.' : 'Preencha os detalhes de uma fonte de renda que se repete mensalmente.'}
               </SheetDescription>
             </SheetHeader>
             <div className="flex-1 space-y-4 py-4 overflow-y-auto pr-4">
@@ -141,7 +154,7 @@ export function AddRecurringIncomeSheet({ children, onSave, accounts }: AddRecur
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Conta de Destino</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione uma conta" />
@@ -158,9 +171,9 @@ export function AddRecurringIncomeSheet({ children, onSave, accounts }: AddRecur
             </div>
             <SheetFooter>
                 <SheetClose asChild>
-                    <Button type="button" variant="outline">Cancelar</Button>
+                    <Button type="button" variant="outline" onClick={() => onSetOpen(false)}>Cancelar</Button>
                 </SheetClose>
-                <Button type="submit">Salvar Receita</Button>
+                <Button type="submit">Salvar</Button>
             </SheetFooter>
           </form>
         </Form>

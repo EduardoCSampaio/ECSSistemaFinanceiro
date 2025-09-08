@@ -6,7 +6,8 @@ import {
     query, 
     onSnapshot,
     deleteDoc,
-    doc
+    doc,
+    updateDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { RecurringIncome } from "@/lib/types";
@@ -26,6 +27,18 @@ export const addRecurringIncome = async (userId: string, data: Omit<RecurringInc
         await addDoc(recurringCollection, data);
     } catch (error) {
         console.error("Error adding recurring income:", error);
+        throw error;
+    }
+};
+
+/**
+ * Update an existing recurring income in Firestore
+ */
+export const updateRecurringIncome = async (userId: string, docId: string, data: Partial<Omit<RecurringIncome, 'id' | 'userId'>>) => {
+    try {
+        await updateDoc(getRecurringIncomeDoc(userId, docId), data);
+    } catch (error) {
+        console.error("Error updating recurring income:", error);
         throw error;
     }
 };
@@ -58,7 +71,7 @@ export const getRecurringIncomes = (userId: string, callback: (incomes: Recurrin
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const incomes: RecurringIncome[] = [];
         querySnapshot.forEach((doc) => {
-            incomes.push({ id: doc.id, userId, ...doc.data() } as RecurringIncome);
+            incomes.push({ id: doc.id, ...doc.data() } as RecurringIncome);
         });
         callback(incomes);
     }, (error) => {

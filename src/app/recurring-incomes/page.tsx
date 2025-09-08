@@ -28,7 +28,7 @@ import {
 import { AddRecurringIncomeSheet } from '@/components/add-recurring-income-sheet';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import type { RecurringIncome, Account } from '@/lib/types';
-import { getRecurringIncomes, addRecurringIncome, deleteRecurringIncome } from '@/services/recurringIncomes';
+import { getRecurringIncomes, addRecurringIncome, updateRecurringIncome, deleteRecurringIncome } from '@/services/recurringIncomes';
 import { getAccounts } from '@/services/accounts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -42,6 +42,8 @@ export default function RecurringIncomesPage() {
   const [recurringIncomes, setRecurringIncomes] = useState<RecurringIncome[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [itemToEdit, setItemToEdit] = useState<RecurringIncome | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<RecurringIncome | null>(null);
   const { toast } = useToast();
@@ -61,9 +63,12 @@ export default function RecurringIncomesPage() {
     }
   }, [user]);
 
-  const handleAddRecurring = async (newData: Omit<RecurringIncome, 'id' | 'userId'>) => {
-    if (user) {
-        await addRecurringIncome(user.uid, newData);
+  const handleSave = async (data: Omit<RecurringIncome, 'id' | 'userId'>) => {
+    if (!user) return;
+    if (itemToEdit) {
+      await updateRecurringIncome(user.uid, itemToEdit.id, data);
+    } else {
+      await addRecurringIncome(user.uid, data);
     }
   };
 
@@ -84,6 +89,16 @@ export default function RecurringIncomesPage() {
     }
     setIsConfirmOpen(false);
     setItemToDelete(null);
+  }
+
+  const openAddSheet = () => {
+    setItemToEdit(null);
+    setIsSheetOpen(true);
+  }
+
+  const openEditSheet = (item: RecurringIncome) => {
+    setItemToEdit(item);
+    setIsSheetOpen(true);
   }
 
   const openDeleteDialog = (item: RecurringIncome) => {
@@ -118,14 +133,12 @@ export default function RecurringIncomesPage() {
       <div className="flex items-center">
         <h1 className="text-lg font-semibold md:text-2xl">Receitas Recorrentes</h1>
         <div className="ml-auto flex items-center gap-2">
-           <AddRecurringIncomeSheet onSave={handleAddRecurring} accounts={accounts}>
-            <Button size="sm" className="h-8 gap-1">
+            <Button size="sm" className="h-8 gap-1" onClick={openAddSheet}>
               <PlusCircle className="h-3.5 w-3.5" />
               <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                 Nova Receita Recorrente
               </span>
             </Button>
-          </AddRecurringIncomeSheet>
         </div>
       </div>
       <Card>
@@ -168,7 +181,7 @@ export default function RecurringIncomesPage() {
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem disabled>
+                                    <DropdownMenuItem onClick={() => openEditSheet(item)}>
                                         <Pencil className="mr-2 h-4 w-4" />
                                         Editar
                                     </DropdownMenuItem>
@@ -187,6 +200,14 @@ export default function RecurringIncomesPage() {
           </Table>
         </CardContent>
       </Card>
+      <AddRecurringIncomeSheet 
+        key={itemToEdit ? itemToEdit.id : 'add'}
+        isOpen={isSheetOpen}
+        onSetOpen={setIsSheetOpen}
+        onSave={handleSave} 
+        itemToEdit={itemToEdit}
+        accounts={accounts}
+      />
       <ConfirmDialog
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}

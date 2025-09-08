@@ -6,14 +6,17 @@ import {
     query, 
     onSnapshot,
     Timestamp,
-    where
+    where,
+    doc,
+    updateDoc,
+    deleteDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Budget, BudgetWithSpent, Transaction } from "@/lib/types";
-import { categories } from "@/lib/data";
 
 // Collection references
 const getBudgetsCollection = (userId: string) => collection(db, `users/${userId}/budgets`);
+const getBudgetDoc = (userId: string, budgetId: string) => doc(db, `users/${userId}/budgets`, budgetId);
 const getTransactionsCollection = (userId: string) => collection(db, `users/${userId}/transactions`);
 
 /**
@@ -31,6 +34,31 @@ export const addBudget = async (userId: string, budgetData: Omit<Budget, 'id' | 
 };
 
 /**
+ * Update an existing budget in Firestore
+ */
+export const updateBudget = async (userId: string, budgetId: string, budgetData: Partial<Omit<Budget, 'id' | 'userId'>>) => {
+    try {
+        await updateDoc(getBudgetDoc(userId, budgetId), budgetData);
+    } catch (error) {
+        console.error("Error updating budget:", error);
+        throw error;
+    }
+};
+
+/**
+ * Delete a budget from Firestore
+ */
+export const deleteBudget = async (userId: string, budgetId: string) => {
+    try {
+        await deleteDoc(getBudgetDoc(userId, budgetId));
+    } catch (error) {
+        console.error("Error deleting budget:", error);
+        throw error;
+    }
+};
+
+
+/**
  * Get all budgets for a user and calculate spent amount in real-time
  * @param userId - The ID of the user
  * @param callback - Function to call with the budget data (including spent amount)
@@ -40,10 +68,14 @@ export const getBudgetsWithSpent = (userId: string, callback: (budgets: BudgetWi
     const budgetsCollection = getBudgetsCollection(userId);
     const qBudgets = query(budgetsCollection);
 
+    let unsubscribeTransactions = () => {};
+
     const unsubscribeBudgets = onSnapshot(qBudgets, (budgetSnapshot) => {
-        const budgets = budgetSnapshot.docs.map(doc => ({ id: doc.id, userId, ...doc.data() } as Budget));
+        const budgets = budgetSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Budget));
         
-        // If there are no budgets, no need to listen for transactions
+        // Unsubscribe from previous transaction listener
+        unsubscribeTransactions();
+
         if (budgets.length === 0) {
             callback([]);
             return;
@@ -60,7 +92,7 @@ export const getBudgetsWithSpent = (userId: string, callback: (budgets: BudgetWi
             where("date", ">=", startOfMonthTimestamp)
         );
 
-        const unsubscribeTransactions = onSnapshot(qTransactions, (transactionSnapshot) => {
+        unsubscribeTransactions = onSnapshot(qTransactions, (transactionSnapshot) => {
             const transactions = transactionSnapshot.docs.map(doc => doc.data() as Transaction);
 
             const budgetsWithSpent = budgets.map(budget => {
@@ -76,18 +108,12 @@ export const getBudgetsWithSpent = (userId: string, callback: (budgets: BudgetWi
             console.error("Error fetching transactions for budgets:", error);
         });
 
-        // This should be returned by the outer function, but we need to manage it.
-        // A more complex setup might be needed if budgets can be added/removed while subscribed.
-        // For now, we assume the budget list is fairly static.
-        // Returning this specific unsubscribe might be tricky.
-        // Let's just return the budget one for now.
-
     }, (error) => {
         console.error("Error fetching budgets:", error);
     });
 
-    // A proper implementation would need to manage both unsubscribes.
-    // For simplicity, we only return the main one. If a budget is added, a new transaction listener is not created for it
-    // until the component remounts.
-    return unsubscribeBudgets;
+    return () => {
+        unsubscribeBudgets();
+        unsubscribeTransactions();
+    };
 };
