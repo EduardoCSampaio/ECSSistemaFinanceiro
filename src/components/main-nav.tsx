@@ -8,6 +8,7 @@ import {
   Landmark,
   FileText,
   PieChart,
+  TrendingUp,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { href: '/accounts', label: 'Contas', icon: Landmark },
   { href: '/budgets', label: 'Orçamentos', icon: PieChart },
   { href: '/reports', label: 'Relatórios', icon: FileText },
+  { href: '/projections', label: 'Projeções', icon: TrendingUp },
 ];
 
 export function MainNav({ isMobile = false }: { isMobile?: boolean }) {
