@@ -30,3 +30,14 @@ export type Budget = {
   spent: number;
   categoryId?: string;
 };
+
+export type RecurringTransaction = {
+  id: string;
+  description: string;
+  amount: number;
+  dayOfMonth: number;
+  category: Category;
+  categoryId: string;
+  account: Account;
+  accountId: string;
+};

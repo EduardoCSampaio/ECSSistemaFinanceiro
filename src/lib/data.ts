@@ -1,5 +1,5 @@
-import type { Account, Category, Transaction, Budget } from '@/lib/types';
-import { Landmark, ShoppingCart, Utensils, Home, Car, Activity, Shirt, Gift, Film, Book, GraduationCap, ArrowDown, ArrowUp } from 'lucide-react';
+import type { Account, Category, Transaction, Budget, RecurringTransaction } from '@/lib/types';
+import { Landmark, ShoppingCart, Utensils, Home, Car, Activity, Shirt, Gift, Film, Book, GraduationCap, ArrowDown, ArrowUp, CalendarClock } from 'lucide-react';
 
 export const accounts: Account[] = [
   { id: 'acc1', name: 'Conta Corrente', bank: 'Banco Principal', balance: 0 },
@@ -19,8 +19,11 @@ export const categories: Category[] = [
   { id: 'cat11', name: 'Salário', icon: ArrowUp },
   { id: 'cat12', name: 'Outras Receitas', icon: ArrowUp },
   { id: 'cat13', name: 'Outras Despesas', icon: ArrowDown },
+  { id: 'cat14', name: 'Contas Fixas', icon: CalendarClock },
 ];
 
 export const transactions: Transaction[] = [];
 
 export const budgets: Budget[] = [];
+
+export const recurringTransactions: RecurringTransaction[] = [];
