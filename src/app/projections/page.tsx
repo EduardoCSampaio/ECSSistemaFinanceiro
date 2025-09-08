@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import {
   Card,
@@ -44,7 +44,6 @@ export default function ProjectionsPage() {
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringTransaction[]>([]);
   const [recurringIncomes, setRecurringIncomes] = useState<RecurringIncome[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [monthsToProject, setMonthsToProject] = useState(6);
 
   useEffect(() => {
@@ -92,13 +91,11 @@ export default function ProjectionsPage() {
 
     const totalMonthlyIncome = recurringIncomes.reduce((sum, income) => sum + income.amount, 0);
 
-    // Start projection from the next month (i=1)
-    for (let i = 1; i <= monthsToProject; i++) {
+    for (let i = 0; i < monthsToProject; i++) {
       const projectionDate = startOfMonth(addMonths(today, i));
 
       const monthlyExpenses = recurringExpenses.reduce((sum, transaction) => {
         const startDate = startOfMonth(transaction.startDate.toDate());
-        // No need to adjust monthsSinceStart, as projectionDate is already in the future
         const monthsSinceStart = differenceInCalendarMonths(projectionDate, startDate);
 
         if (monthsSinceStart < 0) {
@@ -115,7 +112,7 @@ export default function ProjectionsPage() {
            return sum + transaction.amount;
         }
         
-        return sum; // Expense is over or hasn't started
+        return sum;
       }, 0);
       
       const netMonthly = totalMonthlyIncome - monthlyExpenses;
