@@ -26,7 +26,10 @@ import {
   TableCell
 } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-import { addMonths, startOfMonth, endOfMonth, differenceInCalendarMonths, isBefore } from 'date-fns';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { addMonths, startOfMonth, endOfMonth, differenceInCalendarMonths, isBefore, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { Account, RecurringTransaction, RecurringIncome, Transaction } from '@/lib/types';
 import { getAccounts } from '@/services/accounts';
@@ -38,6 +41,74 @@ import { Skeleton } from '@/components/ui/skeleton';
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
+
+function GoalCalculator({ averageMonthlySavings }: { averageMonthlySavings: number }) {
+  const [goalAmount, setGoalAmount] = useState(0);
+  const [monthlyContribution, setMonthlyContribution] = useState(0);
+  const [result, setResult] = useState<{ months: number; endDate: string } | null>(null);
+
+  const calculateGoal = () => {
+    const totalMonthlySavings = averageMonthlySavings + monthlyContribution;
+    if (goalAmount > 0 && totalMonthlySavings > 0) {
+      const monthsNeeded = Math.ceil(goalAmount / totalMonthlySavings);
+      const endDate = addMonths(new Date(), monthsNeeded);
+      setResult({
+        months: monthsNeeded,
+        endDate: format(endDate, "MMMM 'de' yyyy", { locale: ptBR }),
+      });
+    } else {
+      setResult(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Calculadora de Metas Financeiras</CardTitle>
+        <CardDescription>
+          Descubra em quanto tempo você pode atingir seus objetivos financeiros.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="goal-amount">Quanto você quer juntar (R$)?</Label>
+          <Input 
+            id="goal-amount" 
+            type="number" 
+            placeholder="20000"
+            value={goalAmount || ''}
+            onChange={(e) => setGoalAmount(Number(e.target.value))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="monthly-contribution">Quanto a mais você pode guardar por mês (R$)?</Label>
+          <Input 
+            id="monthly-contribution" 
+            type="number"
+            placeholder="300"
+            value={monthlyContribution || ''}
+            onChange={(e) => setMonthlyContribution(Number(e.target.value))}
+          />
+           <p className="text-xs text-muted-foreground">
+            Sua economia mensal média de {formatCurrency(averageMonthlySavings)} já será somada.
+          </p>
+        </div>
+        <Button onClick={calculateGoal} className="w-full">Calcular Meta</Button>
+      </CardContent>
+      {result && (
+        <CardFooter className="flex flex-col items-start gap-2 rounded-lg border bg-muted/50 p-4">
+          <p className="text-sm font-semibold">Resultado:</p>
+          <p className="text-sm text-foreground">
+            Você atingirá sua meta de <strong>{formatCurrency(goalAmount)}</strong> em aproximadamente <strong>{result.months} {result.months > 1 ? 'meses' : 'mês'}</strong>.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Data estimada para conclusão: <strong>{result.endDate}</strong>.
+          </p>
+        </CardFooter>
+      )}
+    </Card>
+  )
+}
 
 export default function ProjectionsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -170,6 +241,12 @@ export default function ProjectionsPage() {
     return results;
   }, [monthsToProject, initialBalance, recurringIncomes, recurringExpenses, transactions]);
   
+  const averageMonthlySavings = useMemo(() => {
+    if (projections.length === 0) return 0;
+    const totalNetProjected = projections.reduce((sum, p) => sum + p.netProjected, 0);
+    return totalNetProjected / projections.length;
+  }, [projections]);
+  
   if (authLoading || loading) {
      return (
        <div className="flex flex-1 flex-col gap-4 md:gap-8">
@@ -179,15 +256,26 @@ export default function ProjectionsPage() {
               <Skeleton className="h-10 w-44" />
            </div>
          </div>
-         <Card>
-           <CardHeader>
-              <Skeleton className="h-6 w-80" />
-              <Skeleton className="h-4 w-96" />
-           </CardHeader>
-           <CardContent>
-             <Skeleton className="h-60 w-full" />
-           </CardContent>
-         </Card>
+         <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                  <Skeleton className="h-6 w-80" />
+                  <Skeleton className="h-4 w-96" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-60 w-full" />
+              </CardContent>
+            </Card>
+             <Card>
+              <CardHeader>
+                  <Skeleton className="h-6 w-80" />
+                  <Skeleton className="h-4 w-96" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-60 w-full" />
+              </CardContent>
+            </Card>
+          </div>
        </div>
      );
   }
@@ -213,52 +301,55 @@ export default function ProjectionsPage() {
         </div>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Demonstração de Resultados (Previsto vs. Realizado)</CardTitle>
-          <CardDescription>
-            Compare suas finanças projetadas (recorrentes) com as transações reais de cada mês.
-            Saldo Inicial (em 1º do Mês): <strong>{formatCurrency(initialBalance)}</strong>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[150px]">Mês</TableHead>
-                <TableHead className="text-right text-sky-500">Receitas Previstas</TableHead>
-                <TableHead className="text-right text-orange-500">Despesas Previstas</TableHead>
-                <TableHead className="text-right">Resultado Previsto</TableHead>
-                <TableHead className="text-right">Resultado Real</TableHead>
-                <TableHead className="text-right">Saldo Final Estimado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {projections.map((p, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium capitalize">{p.month}</TableCell>
-                  <TableCell className="text-right text-sky-500">{formatCurrency(p.projectedIncome)}</TableCell>
-                  <TableCell className="text-right text-orange-500">{formatCurrency(p.projectedExpense)}</TableCell>
-                  <TableCell className={cn("text-right font-semibold", p.netProjected >= 0 ? 'text-foreground' : 'text-destructive')}>
-                    {formatCurrency(p.netProjected)}
-                  </TableCell>
-                  <TableCell className={cn("text-right font-semibold", p.netActual >= 0 ? 'text-emerald-500' : 'text-red-500')}>
-                    {formatCurrency(p.netActual)}
-                  </TableCell>
-                  <TableCell className={cn("text-right font-bold", p.endBalance >= 0 ? 'text-foreground' : 'text-destructive')}>
-                    {formatCurrency(p.endBalance)}
-                  </TableCell>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Demonstração de Resultados (Previsto vs. Realizado)</CardTitle>
+            <CardDescription>
+              Compare suas finanças projetadas (recorrentes) com as transações reais de cada mês.
+              Saldo Inicial (em 1º do Mês): <strong>{formatCurrency(initialBalance)}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[150px]">Mês</TableHead>
+                  <TableHead className="text-right text-sky-500">Receitas Previstas</TableHead>
+                  <TableHead className="text-right text-orange-500">Despesas Previstas</TableHead>
+                  <TableHead className="text-right">Resultado Previsto</TableHead>
+                  <TableHead className="text-right">Resultado Real</TableHead>
+                  <TableHead className="text-right">Saldo Final Estimado</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-        <CardFooter>
-            <p className="text-xs text-muted-foreground">
-                * Projeções são baseadas apenas nas contas e receitas recorrentes cadastradas. A precisão pode variar.
-            </p>
-        </CardFooter>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {projections.map((p, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium capitalize">{p.month}</TableCell>
+                    <TableCell className="text-right text-sky-500">{formatCurrency(p.projectedIncome)}</TableCell>
+                    <TableCell className="text-right text-orange-500">{formatCurrency(p.projectedExpense)}</TableCell>
+                    <TableCell className={cn("text-right font-semibold", p.netProjected >= 0 ? 'text-foreground' : 'text-destructive')}>
+                      {formatCurrency(p.netProjected)}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-semibold", p.netActual >= 0 ? 'text-emerald-500' : 'text-red-500')}>
+                      {formatCurrency(p.netActual)}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-bold", p.endBalance >= 0 ? 'text-foreground' : 'text-destructive')}>
+                      {formatCurrency(p.endBalance)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+          <CardFooter>
+              <p className="text-xs text-muted-foreground">
+                  * Projeções são baseadas apenas nas contas e receitas recorrentes cadastradas. A precisão pode variar.
+              </p>
+          </CardFooter>
+        </Card>
+        <GoalCalculator averageMonthlySavings={averageMonthlySavings} />
+      </div>
     </div>
   );
 }
