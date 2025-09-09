@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 import { CalendarIcon, ArrowRightLeft } from 'lucide-react';
 import { format } from 'date-fns';
@@ -69,6 +69,149 @@ const transferFormSchema = z.object({
 type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 type TransferFormValues = z.infer<typeof transferFormSchema>;
 
+interface TransactionFormContentProps {
+    form: UseFormReturn<TransactionFormValues>;
+    onSubmit: (data: TransactionFormValues) => void;
+    activeTab: string;
+    accounts: Account[];
+    categories: Category[];
+}
+
+const TransactionFormContent: React.FC<TransactionFormContentProps> = ({ form, onSubmit, activeTab, accounts, categories }) => {
+    const transactionType = form.watch('type');
+    const filteredCategories = React.useMemo(() => {
+        const incomeCategoryNames = ['Salário', 'Outras Receitas', 'Transferência'];
+        if (transactionType === 'income') {
+            return categories.filter(c => incomeCategoryNames.includes(c.name));
+        }
+        return categories.filter(c => !incomeCategoryNames.includes(c.name));
+    }, [categories, transactionType]);
+    
+    return (
+        <Form {...form}>
+            <form 
+                id={activeTab === 'income' ? 'transactionFormIncome' : 'transactionForm'}
+                onSubmit={form.handleSubmit(onSubmit)} 
+                className="space-y-4"
+            >
+                <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Descrição</FormLabel>
+                        <FormControl>
+                        <Input placeholder={activeTab === 'income' ? "Ex: Salário" : "Ex: Almoço, Supermercado"} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Valor (R$)</FormLabel>
+                        <FormControl>
+                        <Input type="number" step="0.01" placeholder="50.00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                    control={form.control}
+                    name="accountId"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Conta</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="categoryId"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Categoria</FormLabel>
+                        <div className="relative">
+                            <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                                </Trigger>
+                            </FormControl>
+                            <SelectContent>
+                                {filteredCategories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+                            </SelectContent>
+                            </Select>
+                        </div>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                </div>
+                <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                        <FormLabel>Data</FormLabel>
+                        <Popover>
+                        <PopoverTrigger asChild>
+                            <FormControl>
+                            <Button
+                                variant={'outline'}
+                                className={cn(
+                                'w-full pl-3 text-left font-normal',
+                                !field.value && 'text-muted-foreground'
+                                )}
+                            >
+                                {field.value ? (
+                                format(field.value, 'PPP', { locale: ptBR })
+                                ) : (
+                                <span>Escolha uma data</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                            </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                                date > new Date() || date < new Date('1900-01-01')
+                            }
+                            initialFocus
+                            locale={ptBR}
+                            />
+                        </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+            </form>
+        </Form>
+    );
+};
+
+
 interface AddTransactionSheetProps {
     isOpen: boolean;
     onSetOpen: (isOpen: boolean) => void;
@@ -107,7 +250,7 @@ export function AddTransactionSheet({
   });
   
   useEffect(() => {
-    if (transactionToEdit) {
+    if (transactionToEdit && isOpen) {
       transactionForm.reset({
         ...transactionToEdit,
         date: transactionToEdit.date.toDate(),
@@ -128,19 +271,11 @@ export function AddTransactionSheet({
         fromAccountId: '',
         toAccountId: '',
       });
+       if (!isEditing) {
+        setActiveTab('expense');
+       }
     }
-  }, [transactionToEdit, transactionForm, transferForm, isOpen]);
-
-
-  const transactionType = transactionForm.watch('type');
-
-  const filteredCategories = React.useMemo(() => {
-    const incomeCategoryNames = ['Salário', 'Outras Receitas', 'Transferência'];
-    if (transactionType === 'income') {
-        return categories.filter(c => incomeCategoryNames.includes(c.name));
-    }
-    return categories.filter(c => !incomeCategoryNames.includes(c.name));
-  }, [categories, transactionType]);
+  }, [transactionToEdit, transactionForm, transferForm, isOpen, isEditing]);
 
 
   async function onTransactionSubmit(data: TransactionFormValues) {
@@ -187,6 +322,7 @@ export function AddTransactionSheet({
     }
   }
 
+
   return (
     <Sheet open={isOpen} onOpenChange={onSetOpen}>
       <SheetContent className="sm:max-w-lg">
@@ -206,244 +342,25 @@ export function AddTransactionSheet({
             )}
 
             <div className="flex-1 overflow-y-auto py-4 pr-2">
-                <TabsContent value="expense" forceMount={true} hidden={activeTab !== 'expense' && activeTab !== 'transaction'}>
-                     <Form {...transactionForm}>
-                        <form id="transactionForm" onSubmit={transactionForm.handleSubmit(onTransactionSubmit)} className="space-y-4">
-                            <FormField
-                                control={transactionForm.control}
-                                name="description"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Descrição</FormLabel>
-                                    <FormControl>
-                                    <Input placeholder="Ex: Almoço, Supermercado" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={transactionForm.control}
-                                name="amount"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Valor (R$)</FormLabel>
-                                    <FormControl>
-                                    <Input type="number" step="0.01" placeholder="50.00" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                control={transactionForm.control}
-                                name="accountId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Conta</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Selecione" />
-                                        </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                        {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                                />
-                                <FormField
-                                control={transactionForm.control}
-                                name="categoryId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Categoria</FormLabel>
-                                    <div className="relative">
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                            <SelectValue placeholder="Selecione" />
-                                            </Trigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {filteredCategories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
-                                        </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                                />
-                            </div>
-                            <FormField
-                                control={transactionForm.control}
-                                name="date"
-                                render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                    <FormLabel>Data</FormLabel>
-                                    <Popover>
-                                    <PopoverTrigger asChild>
-                                        <FormControl>
-                                        <Button
-                                            variant={'outline'}
-                                            className={cn(
-                                            'w-full pl-3 text-left font-normal',
-                                            !field.value && 'text-muted-foreground'
-                                            )}
-                                        >
-                                            {field.value ? (
-                                            format(field.value, 'PPP', { locale: ptBR })
-                                            ) : (
-                                            <span>Escolha uma data</span>
-                                            )}
-                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                        </Button>
-                                        </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                        mode="single"
-                                        selected={field.value}
-                                        onSelect={field.onChange}
-                                        disabled={(date) =>
-                                            date > new Date() || date < new Date('1900-01-01')
-                                        }
-                                        initialFocus
-                                        locale={ptBR}
-                                        />
-                                    </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                        </form>
-                    </Form>
+                <TabsContent value="expense" forceMount={isEditing && transactionToEdit?.type === 'expense'}>
+                     <TransactionFormContent
+                        form={transactionForm}
+                        onSubmit={onTransactionSubmit}
+                        activeTab={activeTab}
+                        accounts={accounts}
+                        categories={categories}
+                    />
                 </TabsContent>
-                <TabsContent value="income" forceMount={true} hidden={activeTab !== 'income'}>
-                    {/* This content is the same as 'expense', just pre-setting the type */}
-                    <Form {...transactionForm}>
-                        <form id="transactionFormIncome" onSubmit={transactionForm.handleSubmit(onTransactionSubmit)} className="space-y-4">
-                             <FormField
-                                control={transactionForm.control}
-                                name="description"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Descrição</FormLabel>
-                                    <FormControl>
-                                    <Input placeholder="Ex: Salário, Venda de item" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={transactionForm.control}
-                                name="amount"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Valor (R$)</FormLabel>
-                                    <FormControl>
-                                    <Input type="number" step="0.01" placeholder="3000.00" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                control={transactionForm.control}
-                                name="accountId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Conta</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Selecione" />
-                                        </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                        {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                                />
-                                <FormField
-                                control={transactionForm.control}
-                                name="categoryId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Categoria</FormLabel>
-                                    <div className="relative">
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                            <SelectValue placeholder="Selecione" />
-                                            </Trigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {filteredCategories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
-                                        </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                                />
-                            </div>
-                            <FormField
-                                control={transactionForm.control}
-                                name="date"
-                                render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                    <FormLabel>Data</FormLabel>
-                                    <Popover>
-                                    <PopoverTrigger asChild>
-                                        <FormControl>
-                                        <Button
-                                            variant={'outline'}
-                                            className={cn(
-                                            'w-full pl-3 text-left font-normal',
-                                            !field.value && 'text-muted-foreground'
-                                            )}
-                                        >
-                                            {field.value ? (
-                                            format(field.value, 'PPP', { locale: ptBR })
-                                            ) : (
-                                            <span>Escolha uma data</span>
-                                            )}
-                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                        </Button>
-                                        </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                        mode="single"
-                                        selected={field.value}
-                                        onSelect={field.onChange}
-                                        disabled={(date) =>
-                                            date > new Date() || date < new Date('1900-01-01')
-                                        }
-                                        initialFocus
-                                        locale={ptBR}
-                                        />
-                                    </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                        </form>
-                    </Form>
+                <TabsContent value="income" forceMount={isEditing && transactionToEdit?.type === 'income'}>
+                    <TransactionFormContent
+                        form={transactionForm}
+                        onSubmit={onTransactionSubmit}
+                        activeTab={activeTab}
+                        accounts={accounts}
+                        categories={categories}
+                    />
                 </TabsContent>
-                 <TabsContent value="transfer" forceMount={true} hidden={activeTab !== 'transfer'}>
+                 <TabsContent value="transfer">
                    <Form {...transferForm}>
                         <form id="transferForm" onSubmit={transferForm.handleSubmit(onTransferSubmit)} className="space-y-4">
                             <FormField
@@ -493,7 +410,7 @@ export function AddTransactionSheet({
                                             <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Conta de Destino" />
-                                            </SelectTrigger>
+                                            </Trigger>
                                             </FormControl>
                                             <SelectContent>
                                             {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
@@ -549,6 +466,17 @@ export function AddTransactionSheet({
                         </form>
                    </Form>
                 </TabsContent>
+                {isEditing && (
+                    <TabsContent value="transaction">
+                         <TransactionFormContent
+                            form={transactionForm}
+                            onSubmit={onTransactionSubmit}
+                            activeTab={activeTab}
+                            accounts={accounts}
+                            categories={categories}
+                        />
+                    </TabsContent>
+                )}
             </div>
 
             <SheetFooter>
