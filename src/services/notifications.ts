@@ -18,7 +18,7 @@ import type { BudgetWithSpent, Goal, Notification, RecurringTransaction } from "
 import { getBudgetsWithSpent } from "./budgets";
 import { getGoals } from "./goals";
 import { getRecurringTransactions } from "./recurring";
-import { differenceInDays, differenceInCalendarMonths, startOfMonth } from "date-fns";
+import { differenceInDays, differenceInCalendarMonths, startOfMonth, isSameMonth } from "date-fns";
 
 
 // --- Collection References ---
@@ -209,19 +209,21 @@ const handleRecurringExpenseChecks = async (userId: string, recurring: Recurring
 const createNotificationIfNotExists = async (userId: string, notificationData: Omit<Notification, 'id' | 'userId' | 'isRead' | 'timestamp'>) => {
     const notificationsCollection = getNotificationsCollection(userId);
     const today = new Date();
-    const startOfCurrentMonth = startOfMonth(today);
 
-    // More specific query to avoid extra client-side filtering and potential race conditions.
     const q = query(
         notificationsCollection,
         where("type", "==", notificationData.type),
-        where("relatedId", "==", notificationData.relatedId),
-        where("timestamp", ">=", Timestamp.fromDate(startOfCurrentMonth))
+        where("relatedId", "==", notificationData.relatedId)
     );
     
     const querySnapshot = await getDocs(q);
 
-    if (querySnapshot.empty) {
+    // Check if any existing notification is from the current month
+    const hasNotificationThisMonth = querySnapshot.docs.some(doc => 
+        isSameMonth(doc.data().timestamp.toDate(), today)
+    );
+
+    if (!hasNotificationThisMonth) {
         await addDoc(notificationsCollection, {
             ...notificationData,
             userId,
