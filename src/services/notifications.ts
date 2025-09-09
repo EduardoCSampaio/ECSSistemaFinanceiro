@@ -12,7 +12,8 @@ import {
     writeBatch,
     doc,
     deleteDoc,
-    setDoc
+    setDoc,
+    getDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { BudgetWithSpent, Goal, Notification, RecurringTransaction } from "@/lib/types";
