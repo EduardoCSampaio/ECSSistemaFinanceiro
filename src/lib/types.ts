@@ -73,3 +73,14 @@ export type Goal = {
 export type UserPreferences = {
     monthlyIncome?: number;
 }
+
+export type Notification = {
+  id: string;
+  userId: string;
+  type: 'budget_warning' | 'goal_achieved';
+  message: string;
+  href: string;
+  isRead: boolean;
+  timestamp: Timestamp;
+  relatedId: string; // ID of the budget or goal
+}

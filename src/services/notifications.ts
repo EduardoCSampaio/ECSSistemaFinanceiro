@@ -1,0 +1,161 @@
+'use client';
+
+import {
+    collection,
+    query,
+    where,
+    getDocs,
+    addDoc,
+    Timestamp,
+    orderBy,
+    onSnapshot,
+    writeBatch,
+    doc
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import type { BudgetWithSpent, Goal, Notification } from "@/lib/types";
+import { getBudgetsWithSpent } from "./budgets";
+import { getGoals } from "./goals";
+
+// --- Collection References ---
+const getNotificationsCollection = (userId: string) => collection(db, `users/${userId}/notifications`);
+
+// --- Public Functions ---
+
+/**
+ * Checks for conditions that should trigger notifications (e.g., budget limits, goals achieved)
+ * and creates them if they don't already exist.
+ * @param userId The ID of the user.
+ */
+export const checkForNotifications = async (userId: string) => {
+    // We wrap the logic in a way that the services can be called,
+    // process the data, and then unsubscribe immediately.
+    const checkBudgets = new Promise<void>(resolve => {
+        const unsubscribe = getBudgetsWithSpent(userId, (budgets) => {
+            handleBudgetChecks(userId, budgets);
+            unsubscribe();
+            resolve();
+        });
+    });
+
+    const checkGoals = new Promise<void>(resolve => {
+        const unsubscribe = getGoals(userId, (goals) => {
+            handleGoalChecks(userId, goals);
+            unsubscribe();
+            resolve();
+        });
+    });
+
+    await Promise.all([checkBudgets, checkGoals]);
+};
+
+
+/**
+ * Get all notifications for a user with real-time updates, ordered by date.
+ * @param userId The ID of the user.
+ * @param callback A function to call with the notifications data.
+ * @returns An unsubscribe function for the listener.
+ */
+export const getNotifications = (userId: string, callback: (notifications: Notification[]) => void) => {
+    const q = query(getNotificationsCollection(userId), orderBy("timestamp", "desc"));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const notifications: Notification[] = [];
+        querySnapshot.forEach((doc) => {
+            notifications.push({ id: doc.id, ...doc.data() } as Notification);
+        });
+        callback(notifications);
+    }, (error) => {
+        console.error("Error fetching notifications:", error);
+    });
+
+    return unsubscribe;
+};
+
+/**
+ * Marks all unread notifications as read for a user.
+ * @param userId The ID of the user.
+ */
+export const markAllNotificationsAsRead = async (userId: string) => {
+    const notificationsCollection = getNotificationsCollection(userId);
+    const q = query(notificationsCollection, where("isRead", "==", false));
+    
+    try {
+        const querySnapshot = await getDocs(q);
+        const batch = writeBatch(db);
+        querySnapshot.forEach(docSnap => {
+            const docRef = doc(db, `users/${userId}/notifications`, docSnap.id);
+            batch.update(docRef, { isRead: true });
+        });
+        await batch.commit();
+    } catch (error) {
+        console.error("Error marking notifications as read:", error);
+    }
+}
+
+
+// --- Internal Helper Functions ---
+
+/**
+ * Handles the logic for checking budget-related notifications.
+ */
+const handleBudgetChecks = async (userId: string, budgets: BudgetWithSpent[]) => {
+    for (const budget of budgets) {
+        const percentage = budget.amount > 0 ? (budget.spent / budget.amount) * 100 : 0;
+        if (percentage >= 90) {
+            await createNotificationIfNotExists(userId, {
+                type: 'budget_warning',
+                relatedId: budget.id,
+                message: `Você usou mais de 90% do seu orçamento de ${budget.categoryId}.`,
+                href: '/budgets'
+            });
+        }
+    }
+};
+
+/**
+ * Handles the logic for checking goal-related notifications.
+ */
+const handleGoalChecks = async (userId: string, goals: Goal[]) => {
+    for (const goal of goals) {
+        if (goal.currentAmount >= goal.targetAmount) {
+             await createNotificationIfNotExists(userId, {
+                type: 'goal_achieved',
+                relatedId: goal.id,
+                message: `Parabéns! Você atingiu sua meta de "${goal.name}".`,
+                href: '/goals'
+            });
+        }
+    }
+};
+
+/**
+ * Creates a notification document in Firestore if a notification with the same
+ * type and relatedId does not already exist for the current month.
+ * @param userId The ID of the user.
+ * @param notificationData The core data for the notification.
+ */
+const createNotificationIfNotExists = async (userId: string, notificationData: Omit<Notification, 'id' | 'userId' | 'isRead' | 'timestamp'>) => {
+    const notificationsCollection = getNotificationsCollection(userId);
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startOfMonthTimestamp = Timestamp.fromDate(startOfMonth);
+
+    const q = query(
+        notificationsCollection,
+        where("type", "==", notificationData.type),
+        where("relatedId", "==", notificationData.relatedId),
+        where("timestamp", ">=", startOfMonthTimestamp)
+    );
+    
+    const existingNotifications = await getDocs(q);
+    
+    if (existingNotifications.empty) {
+        await addDoc(notificationsCollection, {
+            ...notificationData,
+            userId,
+            isRead: false,
+            timestamp: Timestamp.now()
+        });
+    }
+};

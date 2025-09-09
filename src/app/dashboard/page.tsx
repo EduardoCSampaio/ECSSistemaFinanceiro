@@ -1,13 +1,23 @@
 'use client';
 
+import { useEffect } from 'react';
 import { SummaryCards } from '@/components/dashboard/summary-cards';
 import { OverviewChart } from '@/components/dashboard/overview-chart';
 import { RecentTransactions } from '@/components/dashboard/recent-transactions';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { checkForNotifications } from '@/services/notifications';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    // Quando o dashboard carregar, verificamos se há novas notificações a serem criadas.
+    if (user) {
+      checkForNotifications(user.uid);
+    }
+  }, [user]);
+
 
   if (authLoading) {
     return (
