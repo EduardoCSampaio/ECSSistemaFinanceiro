@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { TransactionsDataTable } from "@/components/transactions-data-table";
 import { categories } from '@/lib/data';
 import type { Transaction, Account } from "@/lib/types";
-import { getTransactions, addTransaction, updateTransaction, deleteTransaction } from "@/services/transactions";
+import { getTransactions, addTransaction, updateTransaction, deleteTransaction, addTransactionsBatch } from "@/services/transactions";
 import { getAccounts } from "@/services/accounts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,11 @@ export default function TransactionsPage() {
     if (!user) return;
     await addTransaction(user.uid, data);
   };
+  
+  const handleAddTransactionsBatch = async (data: Omit<Transaction, 'id' | 'userId'>[]) => {
+    if(!user) return;
+    await addTransactionsBatch(user.uid, data);
+  }
 
   const handleUpdateTransaction = async (id: string, data: Partial<Omit<Transaction, 'id' | 'userId'>>) => {
       if(!user) return;
@@ -81,6 +86,7 @@ export default function TransactionsPage() {
         onAddTransaction={handleAddTransaction}
         onUpdateTransaction={handleUpdateTransaction}
         onDeleteTransaction={handleDeleteTransaction}
+        onAddTransactionsBatch={handleAddTransactionsBatch}
         accounts={accounts}
         categories={categories}
       />

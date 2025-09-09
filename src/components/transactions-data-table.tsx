@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { PlusCircle, SlidersHorizontal, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, SlidersHorizontal, MoreHorizontal, Pencil, Trash2, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,7 @@ import { Badge } from '@/components/ui/badge';
 import type { Transaction, Account, Category } from '@/lib/types';
 import { AddTransactionSheet } from './add-transaction-sheet';
 import { ConfirmDialog } from './confirm-dialog';
+import { ImportTransactionsDialog } from './import-transactions-dialog';
 import { cn } from '@/lib/utils';
 
 
@@ -53,6 +54,7 @@ interface TransactionsDataTableProps {
   onAddTransaction: (data: Omit<Transaction, 'id' | 'userId'>) => Promise<void>;
   onUpdateTransaction: (id: string, data: Partial<Omit<Transaction, 'id' | 'userId'>>) => Promise<void>;
   onDeleteTransaction: (id: string) => Promise<void>;
+  onAddTransactionsBatch: (data: Omit<Transaction, 'id' | 'userId'>[]) => Promise<void>;
   accounts: Account[];
   categories: Category[];
 }
@@ -62,6 +64,7 @@ export function TransactionsDataTable({
     onAddTransaction, 
     onUpdateTransaction,
     onDeleteTransaction,
+    onAddTransactionsBatch,
     accounts, 
     categories 
 }: TransactionsDataTableProps) {
@@ -258,6 +261,15 @@ export function TransactionsDataTable({
                 })}
             </DropdownMenuContent>
             </DropdownMenu>
+            <ImportTransactionsDialog 
+              accounts={accounts} 
+              categories={categories}
+              onSave={onAddTransactionsBatch}
+            >
+              <Button variant="outline">
+                  <Upload className="mr-2 h-4 w-4" /> Importar CSV
+              </Button>
+            </ImportTransactionsDialog>
             <Button onClick={openAddSheet}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Nova Transação
             </Button>

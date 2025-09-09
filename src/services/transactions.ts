@@ -10,6 +10,7 @@ import {
     Timestamp,
     updateDoc,
     deleteDoc,
+    writeBatch,
     getDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -49,6 +50,59 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
         throw error;
     }
 };
+
+/**
+ * Add multiple transactions and update account balances in a batch
+ */
+export const addTransactionsBatch = async (userId: string, transactionsData: Omit<Transaction, 'id' | 'userId'>[]) => {
+    try {
+        await runTransaction(db, async (firestoreTransaction) => {
+            const transactionsCollectionRef = getTransactionsCollection(userId);
+            const accountBalances: { [key: string]: number } = {};
+
+            // Pre-fetch all necessary account balances to avoid multiple reads of the same doc
+            const accountIds = [...new Set(transactionsData.map(t => t.accountId))];
+            const accountDocs = await Promise.all(accountIds.map(async (id) => {
+                const docRef = getAccountDoc(userId, id);
+                const docSnap = await firestoreTransaction.get(docRef);
+                 if (!docSnap.exists()) throw `Account ${id} does not exist!`;
+                return { id, data: docSnap.data() };
+            }));
+
+            accountDocs.forEach(doc => {
+                accountBalances[doc.id] = doc.data.balance;
+            });
+            
+            // Process each transaction
+            transactionsData.forEach(transactionData => {
+                const { accountId, type, amount } = transactionData;
+                
+                // Add new transaction document to the batch
+                 const newTransactionDoc = {
+                    ...transactionData,
+                    date: Timestamp.fromDate(transactionData.date as unknown as Date)
+                };
+                firestoreTransaction.set(doc(transactionsCollectionRef), newTransactionDoc);
+                
+                // Calculate new balance locally
+                const balanceChange = type === 'income' ? amount : -amount;
+                accountBalances[accountId] += balanceChange;
+            });
+            
+            // Update all account balances in the batch
+            for (const accountId in accountBalances) {
+                const accountDocRef = getAccountDoc(userId, accountId);
+                firestoreTransaction.update(accountDocRef, { balance: accountBalances[accountId] });
+            }
+        });
+
+    } catch (error) {
+        console.error("Batch transaction failed: ", error);
+        throw error;
+    }
+};
+
+
 
 /**
  * Update an existing transaction and adjust account balances accordingly
