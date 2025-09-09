@@ -36,9 +36,17 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
 
     try {
         await runTransaction(db, async (firestoreTransaction) => {
+            // --- ALL READS FIRST ---
             const accountDoc = await firestoreTransaction.get(accountDocRef);
             if (!accountDoc.exists()) throw "Account does not exist!";
-            
+
+            let goalDoc: any = null;
+            if (goalDocRef) {
+                 goalDoc = await firestoreTransaction.get(goalDocRef);
+                 if (!goalDoc.exists()) throw "Goal does not exist!";
+            }
+
+            // --- ALL WRITES SECOND ---
             const currentBalance = accountDoc.data().balance;
             const amount = transactionData.amount;
             const newBalance = transactionData.type === 'income' ? currentBalance + amount : currentBalance - amount;
@@ -47,8 +55,6 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
 
             // If it's a goal contribution, update the goal as well
             if (goalDocRef && transactionData.type === 'expense') {
-                const goalDoc = await firestoreTransaction.get(goalDocRef);
-                if (!goalDoc.exists()) throw "Goal does not exist!";
                 const currentAmount = goalDoc.data().currentAmount;
                 const newAmount = currentAmount + amount;
                 firestoreTransaction.update(goalDocRef, { currentAmount: newAmount });
