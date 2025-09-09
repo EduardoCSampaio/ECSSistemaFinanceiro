@@ -10,7 +10,8 @@ import {
     orderBy,
     onSnapshot,
     writeBatch,
-    doc
+    doc,
+    deleteDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { BudgetWithSpent, Goal, Notification } from "@/lib/types";
@@ -19,6 +20,8 @@ import { getGoals } from "./goals";
 
 // --- Collection References ---
 const getNotificationsCollection = (userId: string) => collection(db, `users/${userId}/notifications`);
+const getNotificationDoc = (userId: string, notificationId: string) => doc(db, `users/${userId}/notifications`, notificationId);
+
 
 // --- Public Functions ---
 
@@ -92,6 +95,20 @@ export const markAllNotificationsAsRead = async (userId: string) => {
         console.error("Error marking notifications as read:", error);
     }
 }
+
+/**
+ * Deletes a specific notification.
+ * @param userId The ID of the user.
+ * @param notificationId The ID of the notification to delete.
+ */
+export const deleteNotification = async (userId: string, notificationId: string) => {
+    try {
+        await deleteDoc(getNotificationDoc(userId, notificationId));
+    } catch (error) {
+        console.error("Error deleting notification:", error);
+        throw error;
+    }
+};
 
 
 // --- Internal Helper Functions ---

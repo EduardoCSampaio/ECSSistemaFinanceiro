@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getAuth, signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { User, LogOut, Monitor, Moon, Sun, Settings } from 'lucide-react';
+import { User, LogOut, Monitor, Moon, Sun, Settings, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -32,9 +32,10 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Icons } from '@/components/icons';
-import { getNotifications, markAllNotificationsAsRead } from '@/services/notifications';
+import { getNotifications, markAllNotificationsAsRead, deleteNotification } from '@/services/notifications';
 import type { Notification } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 
 export function UserNav() {
@@ -42,6 +43,7 @@ export function UserNav() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const { setTheme } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { toast } = useToast();
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -66,6 +68,25 @@ export function UserNav() {
   const handleMarkAllAsRead = async () => {
     if (user) {
       await markAllNotificationsAsRead(user.uid);
+    }
+  }
+
+  const handleDeleteNotification = async (e: React.MouseEvent, notificationId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (user) {
+        try {
+            await deleteNotification(user.uid, notificationId);
+            toast({
+                title: 'Notificação Removida',
+            });
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: 'Não foi possível remover a notificação.',
+            });
+        }
     }
   }
 
@@ -102,11 +123,19 @@ export function UserNav() {
             {notifications.length > 0 ? (
                 notifications.map(notification => (
                   <Link href={notification.href} key={notification.id}>
-                    <div className={cn("p-3 hover:bg-muted/50 block border-b", !notification.isRead && 'bg-primary/5')}>
-                      <p className="text-sm font-medium">{notification.message}</p>
+                    <div className={cn("group p-3 hover:bg-muted/50 block border-b relative", !notification.isRead && 'bg-primary/5')}>
+                      <p className="text-sm font-medium pr-6">{notification.message}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {formatDistanceToNow(notification.timestamp.toDate(), { addSuffix: true, locale: ptBR })}
                       </p>
+                       <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-1/2 right-1 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100"
+                            onClick={(e) => handleDeleteNotification(e, notification.id)}
+                        >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                     </div>
                   </Link>
                 ))
