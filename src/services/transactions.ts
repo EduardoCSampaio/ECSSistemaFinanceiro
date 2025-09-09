@@ -54,7 +54,7 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
             firestoreTransaction.update(accountDocRef, { balance: newBalance });
 
             // If it's a goal contribution, update the goal as well
-            if (goalDocRef && transactionData.type === 'expense') {
+            if (goalDocRef && transactionData.type === 'expense' && goalDoc) {
                 const currentAmount = goalDoc.data().currentAmount;
                 const newAmount = currentAmount + amount;
                 firestoreTransaction.update(goalDocRef, { currentAmount: newAmount });
@@ -175,28 +175,32 @@ export const deleteTransaction = async (userId: string, transactionId: string) =
 
     try {
         await runTransaction(db, async (firestoreTransaction) => {
+            // --- ALL READS FIRST ---
             const transactionDoc = await firestoreTransaction.get(transactionDocRef);
             if (!transactionDoc.exists()) throw "Transaction does not exist!";
             
             const transactionData = transactionDoc.data() as Transaction;
-            const amountToRevert = transactionData.type === 'income' ? -transactionData.amount : transactionData.amount;
-
             const accountRef = getAccountDoc(userId, transactionData.accountId);
             const accountDoc = await firestoreTransaction.get(accountRef);
             
-            if(accountDoc.exists()){
+            let goalDoc: any = null;
+            if (transactionData.goalId) {
+                const goalRef = getGoalDoc(userId, transactionData.goalId);
+                goalDoc = await firestoreTransaction.get(goalRef);
+            }
+
+            // --- ALL WRITES SECOND ---
+            const amountToRevert = transactionData.type === 'income' ? -transactionData.amount : transactionData.amount;
+            
+            if (accountDoc.exists()) {
                 const newBalance = accountDoc.data().balance + amountToRevert;
                 firestoreTransaction.update(accountRef, { balance: newBalance });
             }
 
             // If it was a goal contribution, revert the goal amount as well
-            if (transactionData.goalId) {
-                const goalRef = getGoalDoc(userId, transactionData.goalId);
-                const goalDoc = await firestoreTransaction.get(goalRef);
-                if (goalDoc.exists()) {
-                    const newCurrentAmount = goalDoc.data().currentAmount - transactionData.amount;
-                    firestoreTransaction.update(goalRef, { currentAmount: newCurrentAmount });
-                }
+            if (transactionData.goalId && goalDoc && goalDoc.exists()) {
+                const newCurrentAmount = goalDoc.data().currentAmount - transactionData.amount;
+                firestoreTransaction.update(goalDoc.ref, { currentAmount: newCurrentAmount });
             }
             
             firestoreTransaction.delete(transactionDocRef);
