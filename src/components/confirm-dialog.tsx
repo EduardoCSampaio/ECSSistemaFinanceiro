@@ -30,7 +30,7 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, description }
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onClose}>Cancelar</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            Confirmar Exclusão
+            Confirmar
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

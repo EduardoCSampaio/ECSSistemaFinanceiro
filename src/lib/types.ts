@@ -23,6 +23,7 @@ export type Transaction = {
   type: 'income' | 'expense';
   categoryId: string;
   accountId: string;
+  transferId?: string; // To link two transfer transactions
 };
 
 export type Budget = {

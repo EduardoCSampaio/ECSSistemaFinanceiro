@@ -52,6 +52,7 @@ const formatDate = (date: Date) => {
 interface TransactionsDataTableProps {
   transactions: Transaction[];
   onAddTransaction: (data: Omit<Transaction, 'id' | 'userId'>) => Promise<void>;
+  onAddTransfer: (data: { fromAccountId: string, toAccountId: string, amount: number, date: Date }) => Promise<void>;
   onUpdateTransaction: (id: string, data: Partial<Omit<Transaction, 'id' | 'userId'>>) => Promise<void>;
   onDeleteTransaction: (id: string) => Promise<void>;
   onAddTransactionsBatch: (data: Omit<Transaction, 'id' | 'userId'>[]) => Promise<void>;
@@ -61,7 +62,8 @@ interface TransactionsDataTableProps {
 
 export function TransactionsDataTable({ 
     transactions, 
-    onAddTransaction, 
+    onAddTransaction,
+    onAddTransfer,
     onUpdateTransaction,
     onDeleteTransaction,
     onAddTransactionsBatch,
@@ -99,7 +101,7 @@ export function TransactionsDataTable({
     setIsConfirmOpen(true);
   };
   
-  const handleSave = async (values: Omit<Transaction, 'id' | 'userId'>) => {
+  const handleSaveTransaction = async (values: Omit<Transaction, 'id' | 'userId'>) => {
       if (transactionToEdit) {
           await onUpdateTransaction(transactionToEdit.id, values);
       } else {
@@ -107,6 +109,11 @@ export function TransactionsDataTable({
       }
       setIsSheetOpen(false);
       setTransactionToEdit(null);
+  };
+
+   const handleSaveTransfer = async (values: { fromAccountId: string, toAccountId: string, amount: number, date: Date }) => {
+      await onAddTransfer(values);
+      setIsSheetOpen(false);
   };
 
   const handleDelete = async () => {
@@ -166,6 +173,9 @@ export function TransactionsDataTable({
         id: 'actions',
         cell: ({ row }) => {
           const transaction = row.original;
+          const category = categories.find(c => c.id === transaction.categoryId);
+          const isTransfer = category?.name === 'Transferência';
+
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -176,7 +186,7 @@ export function TransactionsDataTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => openEditSheet(transaction)}>
+                <DropdownMenuItem onClick={() => openEditSheet(transaction)} disabled={isTransfer}>
                   <Pencil className="mr-2 h-4 w-4" /> Editar
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openDeleteDialog(transaction)} className="text-destructive">
@@ -271,7 +281,7 @@ export function TransactionsDataTable({
               </Button>
             </ImportTransactionsDialog>
             <Button onClick={openAddSheet}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Nova Transação
+                <PlusCircle className="mr-2 h-4 w-4" /> Nova Movimentação
             </Button>
         </div>
       </div>
@@ -352,7 +362,8 @@ export function TransactionsDataTable({
         key={transactionToEdit ? transactionToEdit.id : 'new'}
         isOpen={isSheetOpen}
         onSetOpen={setIsSheetOpen}
-        onSave={handleSave} 
+        onSaveTransaction={handleSaveTransaction} 
+        onSaveTransfer={handleSaveTransfer}
         transactionToEdit={transactionToEdit}
         accounts={accounts} 
         categories={categories}
@@ -362,7 +373,7 @@ export function TransactionsDataTable({
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleDelete}
         title="Confirmar Exclusão"
-        description={`Tem certeza que deseja excluir a transação "${transactionToDelete?.description}"? Esta ação não pode ser desfeita.`}
+        description={`Tem certeza que deseja excluir a transação "${transactionToDelete?.description}"? Se for uma transferência, ambas as partes (entrada e saída) serão removidas.`}
       />
     </div>
   );

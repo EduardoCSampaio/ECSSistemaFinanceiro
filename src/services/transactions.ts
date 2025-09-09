@@ -11,10 +11,14 @@ import {
     updateDoc,
     deleteDoc,
     writeBatch,
-    getDoc
+    getDoc,
+    where,
+    getDocs
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Transaction } from "@/lib/types";
+import { v4 as uuidv4 } from 'uuid';
+
 
 // Collection and Doc references
 const getTransactionsCollection = (userId: string) => collection(db, `users/${userId}/transactions`);
@@ -47,6 +51,63 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
         });
     } catch (error) {
         console.error("Transaction failed: ", error);
+        throw error;
+    }
+};
+
+/**
+ * Add a new transfer between accounts.
+ * This creates two transactions (one expense, one income) and updates both account balances.
+ */
+export const addTransfer = async (userId: string, transferData: { fromAccountId: string, toAccountId: string, amount: number, date: Date }) => {
+    const { fromAccountId, toAccountId, amount, date } = transferData;
+    const fromAccountRef = getAccountDoc(userId, fromAccountId);
+    const toAccountRef = getAccountDoc(userId, toAccountId);
+    const transactionsCollectionRef = getTransactionsCollection(userId);
+
+    try {
+        await runTransaction(db, async (firestoreTransaction) => {
+            const fromAccountDoc = await firestoreTransaction.get(fromAccountRef);
+            const toAccountDoc = await firestoreTransaction.get(toAccountRef);
+
+            if (!fromAccountDoc.exists()) throw `Origin account ${fromAccountId} does not exist!`;
+            if (!toAccountDoc.exists()) throw `Destination account ${toAccountId} does not exist!`;
+
+            // Update balances
+            const fromAccountBalance = fromAccountDoc.data().balance;
+            const toAccountBalance = toAccountDoc.data().balance;
+            firestoreTransaction.update(fromAccountRef, { balance: fromAccountBalance - amount });
+            firestoreTransaction.update(toAccountRef, { balance: toAccountBalance + amount });
+
+            const transferId = uuidv4();
+            const transactionTimestamp = Timestamp.fromDate(date);
+
+            // Create expense transaction
+            const expenseTransaction: Omit<Transaction, 'id' | 'userId'> = {
+                accountId: fromAccountId,
+                amount,
+                categoryId: 'cat15', // Transfer category
+                date: transactionTimestamp,
+                description: `Transferência para ${toAccountDoc.data().name}`,
+                type: 'expense',
+                transferId,
+            };
+            firestoreTransaction.set(doc(transactionsCollectionRef), expenseTransaction);
+
+            // Create income transaction
+            const incomeTransaction: Omit<Transaction, 'id' | 'userId'> = {
+                accountId: toAccountId,
+                amount,
+                categoryId: 'cat15', // Transfer category
+                date: transactionTimestamp,
+                description: `Transferência de ${fromAccountDoc.data().name}`,
+                type: 'income',
+                transferId,
+            };
+            firestoreTransaction.set(doc(transactionsCollectionRef), incomeTransaction);
+        });
+    } catch (error) {
+        console.error("Transfer failed: ", error);
         throw error;
     }
 };
@@ -148,6 +209,7 @@ export const updateTransaction = async (userId: string, transactionId: string, u
 
 /**
  * Delete a transaction and revert the balance change on the associated account
+ * If it's a transfer, delete both linked transactions.
  */
 export const deleteTransaction = async (userId: string, transactionId: string) => {
     const transactionDocRef = getTransactionDoc(userId, transactionId);
@@ -157,17 +219,47 @@ export const deleteTransaction = async (userId: string, transactionId: string) =
             const transactionDoc = await firestoreTransaction.get(transactionDocRef);
             if (!transactionDoc.exists()) throw "Transaction does not exist!";
 
-            const transaction = transactionDoc.data() as Transaction;
-            const amountToRevert = transaction.type === 'income' ? -transaction.amount : transaction.amount;
+            const transactionToDelete = transactionDoc.data() as Transaction;
             
-            const accountRef = getAccountDoc(userId, transaction.accountId);
-            const accountDoc = await firestoreTransaction.get(accountRef);
-            if(accountDoc.exists()){
-                const newBalance = accountDoc.data().balance + amountToRevert;
-                firestoreTransaction.update(accountRef, { balance: newBalance });
-            }
+            // If it's a transfer, find and delete the other part too
+            if (transactionToDelete.transferId) {
+                const q = query(getTransactionsCollection(userId), where("transferId", "==", transactionToDelete.transferId));
+                const querySnapshot = await getDocs(q);
+                
+                querySnapshot.forEach(doc => {
+                    const t = doc.data() as Transaction;
+                    const amountToRevert = t.type === 'income' ? -t.amount : t.amount;
+                    const accountRef = getAccountDoc(userId, t.accountId);
+                    
+                    // We don't need to get the account doc again inside the loop for balance update,
+                    // we can just prepare the update. The transaction runner will handle consistency.
+                    firestoreTransaction.update(accountRef, { balance: doc.ref.parent.parent ? (getDoc(accountRef).then(d => d.data()?.balance || 0)) : 0 + amountToRevert });
+                    firestoreTransaction.delete(doc.ref);
+                });
 
-            firestoreTransaction.delete(transactionDocRef);
+                const batch = writeBatch(db);
+                querySnapshot.forEach(async (doc) => {
+                    const t = doc.data() as Transaction;
+                    const amountToRevert = t.type === 'income' ? -t.amount : t.amount;
+                    const accountRef = getAccountDoc(userId, t.accountId);
+                    
+                    const accountSnap = await firestoreTransaction.get(accountRef);
+                    if (accountSnap.exists()) {
+                        firestoreTransaction.update(accountRef, { balance: accountSnap.data().balance + amountToRevert });
+                    }
+                    firestoreTransaction.delete(doc.ref);
+                });
+
+            } else {
+                 const amountToRevert = transactionToDelete.type === 'income' ? -transactionToDelete.amount : transactionToDelete.amount;
+                 const accountRef = getAccountDoc(userId, transactionToDelete.accountId);
+                 const accountDoc = await firestoreTransaction.get(accountRef);
+                 if(accountDoc.exists()){
+                     const newBalance = accountDoc.data().balance + amountToRevert;
+                     firestoreTransaction.update(accountRef, { balance: newBalance });
+                 }
+                 firestoreTransaction.delete(transactionDocRef);
+            }
         });
     } catch (error) {
         console.error("Delete transaction failed: ", error);
