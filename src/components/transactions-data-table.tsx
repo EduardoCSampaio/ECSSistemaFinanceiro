@@ -52,7 +52,6 @@ const formatDate = (date: Date) => {
 interface TransactionsDataTableProps {
   transactions: Transaction[];
   onAddTransaction: (data: Omit<Transaction, 'id' | 'userId'>) => Promise<void>;
-  onAddTransfer: (data: { fromAccountId: string, toAccountId: string, amount: number, date: Date }) => Promise<void>;
   onUpdateTransaction: (id: string, data: Partial<Omit<Transaction, 'id' | 'userId'>>) => Promise<void>;
   onDeleteTransaction: (id: string) => Promise<void>;
   onAddTransactionsBatch: (data: Omit<Transaction, 'id' | 'userId'>[]) => Promise<void>;
@@ -63,7 +62,6 @@ interface TransactionsDataTableProps {
 export function TransactionsDataTable({ 
     transactions, 
     onAddTransaction,
-    onAddTransfer,
     onUpdateTransaction,
     onDeleteTransaction,
     onAddTransactionsBatch,
@@ -109,11 +107,6 @@ export function TransactionsDataTable({
       }
       setIsSheetOpen(false);
       setTransactionToEdit(null);
-  };
-
-   const handleSaveTransfer = async (values: { fromAccountId: string, toAccountId: string, amount: number, date: Date }) => {
-      await onAddTransfer(values);
-      setIsSheetOpen(false);
   };
 
   const handleDelete = async () => {
@@ -281,7 +274,7 @@ export function TransactionsDataTable({
               </Button>
             </ImportTransactionsDialog>
             <Button onClick={openAddSheet}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Nova Movimentação
+                <PlusCircle className="mr-2 h-4 w-4" /> Nova Transação
             </Button>
         </div>
       </div>
@@ -362,8 +355,7 @@ export function TransactionsDataTable({
         key={transactionToEdit ? transactionToEdit.id : 'new'}
         isOpen={isSheetOpen}
         onSetOpen={setIsSheetOpen}
-        onSaveTransaction={handleSaveTransaction} 
-        onSaveTransfer={handleSaveTransfer}
+        onSave={handleSaveTransaction} 
         transactionToEdit={transactionToEdit}
         accounts={accounts} 
         categories={categories}
@@ -373,7 +365,7 @@ export function TransactionsDataTable({
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleDelete}
         title="Confirmar Exclusão"
-        description={`Tem certeza que deseja excluir a transação "${transactionToDelete?.description}"? Se for uma transferência, ambas as partes (entrada e saída) serão removidas.`}
+        description={`Tem certeza que deseja excluir a transação "${transactionToDelete?.description}"? Esta ação não pode ser desfeita.`}
       />
     </div>
   );

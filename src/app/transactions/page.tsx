@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { TransactionsDataTable } from "@/components/transactions-data-table";
 import { categories } from '@/lib/data';
 import type { Transaction, Account } from "@/lib/types";
-import { getTransactions, addTransaction, updateTransaction, deleteTransaction, addTransactionsBatch, addTransfer } from "@/services/transactions";
+import { getTransactions, addTransaction, updateTransaction, deleteTransaction, addTransactionsBatch } from "@/services/transactions";
 import { getAccounts } from "@/services/accounts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -36,11 +36,6 @@ export default function TransactionsPage() {
     if (!user) return;
     await addTransaction(user.uid, data);
   };
-  
-  const handleAddTransfer = async (data: { fromAccountId: string, toAccountId: string, amount: number, date: Date }) => {
-    if (!user) return;
-    await addTransfer(user.uid, data);
-  }
 
   const handleAddTransactionsBatch = async (data: Omit<Transaction, 'id' | 'userId'>[]) => {
     if(!user) return;
@@ -89,7 +84,6 @@ export default function TransactionsPage() {
       <TransactionsDataTable 
         transactions={transactions} 
         onAddTransaction={handleAddTransaction}
-        onAddTransfer={handleAddTransfer}
         onUpdateTransaction={handleUpdateTransaction}
         onDeleteTransaction={handleDeleteTransaction}
         onAddTransactionsBatch={handleAddTransactionsBatch}
