@@ -39,7 +39,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import type { Transaction, Account, Category } from '@/lib/types';
+import type { Transaction, Account, Category, Goal } from '@/lib/types';
 
 
 const transactionFormSchema = z.object({
@@ -53,6 +53,7 @@ const transactionFormSchema = z.object({
   date: z.date(),
   accountId: z.string().min(1, { message: "Selecione uma conta."}),
   categoryId: z.string().min(1, { message: "Selecione uma categoria."}),
+  goalId: z.string().optional(),
 });
 
 type TransactionFormValues = z.infer<typeof transactionFormSchema>;
@@ -64,6 +65,7 @@ interface AddTransactionSheetProps {
     transactionToEdit?: Transaction | null;
     accounts: Account[];
     categories: Category[];
+    goals: Goal[];
 }
 
 export function AddTransactionSheet({ 
@@ -72,7 +74,8 @@ export function AddTransactionSheet({
     onSave, 
     transactionToEdit, 
     accounts, 
-    categories 
+    categories,
+    goals
 }: AddTransactionSheetProps) {
   const { toast } = useToast();
   const isEditing = !!transactionToEdit;
@@ -92,6 +95,12 @@ export function AddTransactionSheet({
   const expenseCategories = useMemo(() => 
     categories.filter(c => !['Salário', 'Outras Receitas'].includes(c.name)), 
   [categories]);
+
+  const selectedCategoryId = form.watch('categoryId');
+  const isGoalContribution = useMemo(() => {
+    const category = categories.find(c => c.id === selectedCategoryId);
+    return category?.name === 'Aporte para Meta';
+  }, [selectedCategoryId, categories]);
 
 
   useEffect(() => {
@@ -120,6 +129,7 @@ export function AddTransactionSheet({
     if (isEditing) return;
     form.setValue('type', activeTab as 'income' | 'expense');
     form.setValue('categoryId', '');
+    form.setValue('goalId', undefined);
   }, [activeTab, isEditing, form])
 
   async function onSubmit(data: TransactionFormValues) {
@@ -236,6 +246,30 @@ export function AddTransactionSheet({
                     )}
                     />
                 </div>
+                {isGoalContribution && (
+                  <FormField
+                    control={form.control}
+                    name="goalId"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Meta de Destino</FormLabel>
+                        <div className="relative">
+                            <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                <SelectValue placeholder="Selecione a meta" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {goals.map(goal => <SelectItem key={goal.id} value={goal.id}>{goal.name}</SelectItem>)}
+                            </SelectContent>
+                            </Select>
+                        </div>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                )}
                 <FormField
                     control={form.control}
                     name="date"

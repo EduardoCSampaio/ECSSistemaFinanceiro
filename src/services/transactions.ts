@@ -23,6 +23,8 @@ import type { Transaction } from "@/lib/types";
 const getTransactionsCollection = (userId: string) => collection(db, `users/${userId}/transactions`);
 const getTransactionDoc = (userId: string, transactionId: string) => doc(db, `users/${userId}/transactions`, transactionId);
 const getAccountDoc = (userId: string, accountId: string) => doc(db, `users/${userId}/accounts`, accountId);
+const getGoalDoc = (userId: string, goalId: string) => doc(db, `users/${userId}/goals`, goalId);
+
 
 /**
  * Add a new transaction and update the account balance in a single operation
@@ -30,6 +32,7 @@ const getAccountDoc = (userId: string, accountId: string) => doc(db, `users/${us
 export const addTransaction = async (userId: string, transactionData: Omit<Transaction, 'id' | 'userId'>) => {
     const accountDocRef = getAccountDoc(userId, transactionData.accountId);
     const transactionsCollectionRef = getTransactionsCollection(userId);
+    const goalDocRef = transactionData.goalId ? getGoalDoc(userId, transactionData.goalId) : null;
 
     try {
         await runTransaction(db, async (firestoreTransaction) => {
@@ -41,6 +44,15 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
             const newBalance = transactionData.type === 'income' ? currentBalance + amount : currentBalance - amount;
 
             firestoreTransaction.update(accountDocRef, { balance: newBalance });
+
+            // If it's a goal contribution, update the goal as well
+            if (goalDocRef && transactionData.type === 'expense') {
+                const goalDoc = await firestoreTransaction.get(goalDocRef);
+                if (!goalDoc.exists()) throw "Goal does not exist!";
+                const currentAmount = goalDoc.data().currentAmount;
+                const newAmount = currentAmount + amount;
+                firestoreTransaction.update(goalDocRef, { currentAmount: newAmount });
+            }
 
             const newTransactionDoc = {
                 ...transactionData,
@@ -169,6 +181,16 @@ export const deleteTransaction = async (userId: string, transactionId: string) =
             if(accountDoc.exists()){
                 const newBalance = accountDoc.data().balance + amountToRevert;
                 firestoreTransaction.update(accountRef, { balance: newBalance });
+            }
+
+            // If it was a goal contribution, revert the goal amount as well
+            if (transactionData.goalId) {
+                const goalRef = getGoalDoc(userId, transactionData.goalId);
+                const goalDoc = await firestoreTransaction.get(goalRef);
+                if (goalDoc.exists()) {
+                    const newCurrentAmount = goalDoc.data().currentAmount - transactionData.amount;
+                    firestoreTransaction.update(goalRef, { currentAmount: newCurrentAmount });
+                }
             }
             
             firestoreTransaction.delete(transactionDocRef);

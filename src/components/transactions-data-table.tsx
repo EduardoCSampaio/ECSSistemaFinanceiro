@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import type { Transaction, Account, Category } from '@/lib/types';
+import type { Transaction, Account, Category, Goal } from '@/lib/types';
 import { AddTransactionSheet } from './add-transaction-sheet';
 import { ConfirmDialog } from './confirm-dialog';
 import { ImportTransactionsDialog } from './import-transactions-dialog';
@@ -57,6 +57,7 @@ interface TransactionsDataTableProps {
   onAddTransactionsBatch: (data: Omit<Transaction, 'id' | 'userId'>[]) => Promise<void>;
   accounts: Account[];
   categories: Category[];
+  goals: Goal[];
 }
 
 export function TransactionsDataTable({ 
@@ -66,7 +67,8 @@ export function TransactionsDataTable({
     onDeleteTransaction,
     onAddTransactionsBatch,
     accounts, 
-    categories 
+    categories,
+    goals
 }: TransactionsDataTableProps) {
   const [data, setData] = React.useState(() => [...transactions]);
   const [sorting, setSorting] = React.useState<SortingState>([
@@ -359,6 +361,7 @@ export function TransactionsDataTable({
         transactionToEdit={transactionToEdit}
         accounts={accounts} 
         categories={categories}
+        goals={goals}
       />
       <ConfirmDialog
         isOpen={isConfirmOpen}

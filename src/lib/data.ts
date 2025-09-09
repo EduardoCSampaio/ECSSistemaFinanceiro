@@ -1,5 +1,5 @@
 import type { Category } from '@/lib/types';
-import { Landmark, ShoppingCart, Utensils, Home, Car, Activity, Shirt, Gift, Film, Book, GraduationCap, ArrowDown, ArrowUp, CalendarClock, ArrowRightLeft } from 'lucide-react';
+import { Landmark, ShoppingCart, Utensils, Home, Car, Activity, Shirt, Gift, Film, Book, GraduationCap, ArrowDown, ArrowUp, CalendarClock, ArrowRightLeft, PiggyBank } from 'lucide-react';
 
 // Static data like categories can remain here
 export const categories: Category[] = [
@@ -18,6 +18,7 @@ export const categories: Category[] = [
   { id: 'cat13', name: 'Outras Despesas', icon: ArrowDown },
   { id: 'cat14', name: 'Contas Fixas', icon: CalendarClock },
   { id: 'cat15', name: 'Transferência', icon: ArrowRightLeft },
+  { id: 'cat16', name: 'Aporte para Meta', icon: PiggyBank },
 ];
 
 // User-specific data is now fetched from Firestore, so these arrays are empty.

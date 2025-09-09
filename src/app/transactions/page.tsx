@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { useAuth } from '@/hooks/use-auth';
 import { TransactionsDataTable } from "@/components/transactions-data-table";
 import { categories } from '@/lib/data';
-import type { Transaction, Account } from "@/lib/types";
+import type { Transaction, Account, Goal } from "@/lib/types";
 import { getTransactions, addTransaction, updateTransaction, deleteTransaction, addTransactionsBatch } from "@/services/transactions";
 import { getAccounts } from "@/services/accounts";
+import { getGoals } from "@/services/goals";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
@@ -14,6 +15,7 @@ export default function TransactionsPage() {
   const { user, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -21,16 +23,30 @@ export default function TransactionsPage() {
     if (user) {
       const unsubscribeTransactions = getTransactions(user.uid, (data) => {
         setTransactions(data);
-        setLoading(false);
+        checkLoadingState();
       });
-      const unsubscribeAccounts = getAccounts(user.uid, setAccounts);
+      const unsubscribeAccounts = getAccounts(user.uid, (data) => {
+        setAccounts(data);
+        checkLoadingState();
+      });
+      const unsubscribeGoals = getGoals(user.uid, (data) => {
+        setGoals(data);
+        checkLoadingState();
+      });
 
       return () => {
         unsubscribeTransactions();
         unsubscribeAccounts();
+        unsubscribeGoals();
       };
     }
   }, [user]);
+
+  const checkLoadingState = () => {
+    // This function can be more sophisticated depending on what data is essential
+    // For now, we'll consider it loaded when transactions are loaded.
+    setLoading(false);
+  }
 
   const handleAddTransaction = async (data: Omit<Transaction, 'id' | 'userId'>) => {
     if (!user) return;
@@ -89,6 +105,7 @@ export default function TransactionsPage() {
         onAddTransactionsBatch={handleAddTransactionsBatch}
         accounts={accounts}
         categories={categories}
+        goals={goals}
       />
     </div>
   );

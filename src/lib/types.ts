@@ -24,6 +24,7 @@ export type Transaction = {
   categoryId: string;
   accountId: string;
   transferId?: string; // To link two transfer transactions
+  goalId?: string;
 };
 
 export type Budget = {
