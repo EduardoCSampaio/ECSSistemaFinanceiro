@@ -18,7 +18,7 @@ import type { BudgetWithSpent, Goal, Notification, RecurringTransaction } from "
 import { getBudgetsWithSpent } from "./budgets";
 import { getGoals } from "./goals";
 import { getRecurringTransactions } from "./recurring";
-import { differenceInDays, differenceInCalendarMonths, isBefore, startOfMonth } from "date-fns";
+import { differenceInDays, differenceInCalendarMonths, startOfMonth } from "date-fns";
 
 
 // --- Collection References ---
@@ -128,14 +128,15 @@ export const deleteNotification = async (userId: string, notificationId: string)
  * Handles the logic for checking budget-related notifications.
  */
 const handleBudgetChecks = async (userId: string, budgets: BudgetWithSpent[]) => {
+    const categoryMap = new Map(categories.map(c => [c.id, c.name]));
     for (const budget of budgets) {
         const percentage = budget.amount > 0 ? (budget.spent / budget.amount) * 100 : 0;
-        const category = categories.find(c => c.id === budget.categoryId);
         if (percentage >= 90) {
+            const categoryName = categoryMap.get(budget.categoryId) || 'uma categoria';
             await createNotificationIfNotExists(userId, {
                 type: 'budget_warning',
                 relatedId: budget.id,
-                message: `Você usou mais de 90% do seu orçamento de ${category?.name || 'uma categoria'}.`,
+                message: `Você usou mais de 90% do seu orçamento de ${categoryName}.`,
                 href: '/budgets'
             });
         }
@@ -163,12 +164,13 @@ const handleGoalChecks = async (userId: string, goals: Goal[]) => {
  */
 const handleRecurringExpenseChecks = async (userId: string, recurring: RecurringTransaction[]) => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today's date
     
     for (const expense of recurring) {
-        const expenseDate = expense.startDate.toDate();
+        const expenseStartDate = expense.startDate.toDate();
         // Check if the expense is still active
         if (expense.installments !== null) {
-            const monthsPassed = differenceInCalendarMonths(today, expenseDate);
+            const monthsPassed = differenceInCalendarMonths(today, expenseStartDate);
             if (monthsPassed >= expense.installments) {
                 continue; // Installments finished, skip
             }
@@ -178,10 +180,19 @@ const handleRecurringExpenseChecks = async (userId: string, recurring: Recurring
         const daysUntilDue = differenceInDays(dueDateInCurrentMonth, today);
 
         if (daysUntilDue >= 0 && daysUntilDue <= 3) {
+            let message = '';
+            if (daysUntilDue === 0) {
+                message = `Sua conta '${expense.description}' vence hoje. Lembre-se de realizar o pagamento!`;
+            } else if (daysUntilDue === 1) {
+                message = `Sua conta '${expense.description}' vence amanhã!`;
+            } else {
+                message = `Sua conta '${expense.description}' vence em ${daysUntilDue} dias.`;
+            }
+
              await createNotificationIfNotExists(userId, {
                 type: 'recurring_due',
                 relatedId: expense.id,
-                message: `Sua conta recorrente '${expense.description}' vence em ${daysUntilDue} ${daysUntilDue === 1 ? 'dia' : 'dias'}.`,
+                message: message,
                 href: '/recurring-expenses'
             });
         }
@@ -200,22 +211,17 @@ const createNotificationIfNotExists = async (userId: string, notificationData: O
     const today = new Date();
     const startOfCurrentMonth = startOfMonth(today);
 
-    // Simplified query to avoid composite index
+    // More specific query to avoid extra client-side filtering and potential race conditions.
     const q = query(
         notificationsCollection,
         where("type", "==", notificationData.type),
-        where("relatedId", "==", notificationData.relatedId)
+        where("relatedId", "==", notificationData.relatedId),
+        where("timestamp", ">=", Timestamp.fromDate(startOfCurrentMonth))
     );
     
     const querySnapshot = await getDocs(q);
-    
-    // Client-side filtering for the current month
-    const existingNotificationsThisMonth = querySnapshot.docs.filter(doc => {
-        const timestamp = doc.data().timestamp.toDate();
-        return timestamp >= startOfCurrentMonth;
-    });
 
-    if (existingNotificationsThisMonth.length === 0) {
+    if (querySnapshot.empty) {
         await addDoc(notificationsCollection, {
             ...notificationData,
             userId,
