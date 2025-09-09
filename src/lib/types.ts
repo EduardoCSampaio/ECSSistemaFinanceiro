@@ -77,10 +77,10 @@ export type UserPreferences = {
 export type Notification = {
   id: string;
   userId: string;
-  type: 'budget_warning' | 'goal_achieved';
+  type: 'budget_warning' | 'goal_achieved' | 'recurring_due';
   message: string;
   href: string;
   isRead: boolean;
   timestamp: Timestamp;
-  relatedId: string; // ID of the budget or goal
+  relatedId: string; // ID of the budget, goal, or recurring expense
 }

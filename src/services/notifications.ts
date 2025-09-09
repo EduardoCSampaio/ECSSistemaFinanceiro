@@ -14,9 +14,12 @@ import {
     deleteDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { BudgetWithSpent, Goal, Notification } from "@/lib/types";
+import type { BudgetWithSpent, Goal, Notification, RecurringTransaction } from "@/lib/types";
 import { getBudgetsWithSpent } from "./budgets";
 import { getGoals } from "./goals";
+import { getRecurringTransactions } from "./recurring";
+import { differenceInDays, differenceInCalendarMonths, isBefore, startOfMonth } from "date-fns";
+
 
 // --- Collection References ---
 const getNotificationsCollection = (userId: string) => collection(db, `users/${userId}/notifications`);
@@ -49,7 +52,15 @@ export const checkForNotifications = async (userId: string) => {
         });
     });
 
-    await Promise.all([checkBudgets, checkGoals]);
+    const checkRecurring = new Promise<void>(resolve => {
+        const unsubscribe = getRecurringTransactions(userId, (recurring) => {
+            handleRecurringExpenseChecks(userId, recurring);
+            unsubscribe();
+            resolve();
+        })
+    });
+
+    await Promise.all([checkBudgets, checkGoals, checkRecurring]);
 };
 
 
@@ -148,6 +159,37 @@ const handleGoalChecks = async (userId: string, goals: Goal[]) => {
 };
 
 /**
+ * Handles logic for checking recurring expense due dates.
+ */
+const handleRecurringExpenseChecks = async (userId: string, recurring: RecurringTransaction[]) => {
+    const today = new Date();
+    
+    for (const expense of recurring) {
+        const expenseDate = expense.startDate.toDate();
+        // Check if the expense is still active
+        if (expense.installments !== null) {
+            const monthsPassed = differenceInCalendarMonths(today, expenseDate);
+            if (monthsPassed >= expense.installments) {
+                continue; // Installments finished, skip
+            }
+        }
+        
+        const dueDateInCurrentMonth = new Date(today.getFullYear(), today.getMonth(), expense.dayOfMonth);
+        const daysUntilDue = differenceInDays(dueDateInCurrentMonth, today);
+
+        if (daysUntilDue >= 0 && daysUntilDue <= 3) {
+             await createNotificationIfNotExists(userId, {
+                type: 'recurring_due',
+                relatedId: expense.id,
+                message: `Sua conta recorrente '${expense.description}' vence em ${daysUntilDue} ${daysUntilDue === 1 ? 'dia' : 'dias'}.`,
+                href: '/recurring-expenses'
+            });
+        }
+    }
+};
+
+
+/**
  * Creates a notification document in Firestore if a notification with the same
  * type and relatedId does not already exist for the current month.
  * @param userId The ID of the user.
@@ -156,7 +198,7 @@ const handleGoalChecks = async (userId: string, goals: Goal[]) => {
 const createNotificationIfNotExists = async (userId: string, notificationData: Omit<Notification, 'id' | 'userId' | 'isRead' | 'timestamp'>) => {
     const notificationsCollection = getNotificationsCollection(userId);
     const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startOfCurrentMonth = startOfMonth(today);
 
     // Simplified query to avoid composite index
     const q = query(
@@ -170,7 +212,7 @@ const createNotificationIfNotExists = async (userId: string, notificationData: O
     // Client-side filtering for the current month
     const existingNotificationsThisMonth = querySnapshot.docs.filter(doc => {
         const timestamp = doc.data().timestamp.toDate();
-        return timestamp >= startOfMonth;
+        return timestamp >= startOfCurrentMonth;
     });
 
     if (existingNotificationsThisMonth.length === 0) {
