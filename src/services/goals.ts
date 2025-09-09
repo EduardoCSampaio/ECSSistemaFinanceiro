@@ -23,8 +23,10 @@ const getGoalDoc = (userId: string, goalId: string) => doc(db, `users/${userId}/
 export const addGoal = async (userId: string, goalData: Omit<Goal, 'id' | 'userId'>) => {
     try {
         const dataToSave: any = { ...goalData };
-        if (goalData.deadline) {
-            dataToSave.deadline = Timestamp.fromDate(goalData.deadline as unknown as Date);
+        if (dataToSave.deadline) {
+            dataToSave.deadline = Timestamp.fromDate(dataToSave.deadline as unknown as Date);
+        } else {
+            delete dataToSave.deadline; // Remove the deadline field if it's undefined or null
         }
         await addDoc(getGoalsCollection(userId), dataToSave);
     } catch (error) {
