@@ -59,6 +59,15 @@ export type RecurringIncome = {
   accountId: string;
 };
 
+export type Goal = {
+  id: string;
+  userId: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline?: Timestamp;
+};
+
 
 export type UserPreferences = {
     monthlyIncome?: number;
