@@ -11,26 +11,28 @@ import {
     onSnapshot,
     writeBatch,
     doc,
-    deleteDoc
+    deleteDoc,
+    setDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { BudgetWithSpent, Goal, Notification, RecurringTransaction } from "@/lib/types";
 import { getBudgetsWithSpent } from "./budgets";
 import { getGoals } from "./goals";
 import { getRecurringTransactions } from "./recurring";
-import { differenceInDays, differenceInCalendarMonths, startOfMonth, isSameMonth } from "date-fns";
+import { differenceInDays, isToday, startOfDay } from "date-fns";
 
 
 // --- Collection References ---
 const getNotificationsCollection = (userId: string) => collection(db, `users/${userId}/notifications`);
 const getNotificationDoc = (userId: string, notificationId: string) => doc(db, `users/${userId}/notifications`, notificationId);
+const getGeneratedNotificationsCollection = (userId: string) => collection(db, `users/${userId}/generatedNotifications`);
 
 
 // --- Public Functions ---
 
 /**
  * Checks for conditions that should trigger notifications (e.g., budget limits, goals achieved)
- * and creates them if they don't already exist.
+ * and creates them if they don't already exist for the day.
  * @param userId The ID of the user.
  */
 export const checkForNotifications = async (userId: string) => {
@@ -163,15 +165,20 @@ const handleGoalChecks = async (userId: string, goals: Goal[]) => {
  * Handles logic for checking recurring expense due dates.
  */
 const handleRecurringExpenseChecks = async (userId: string, recurring: RecurringTransaction[]) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today's date
-    
+    const today = startOfDay(new Date());
+
     for (const expense of recurring) {
         const expenseStartDate = expense.startDate.toDate();
+        // Skip if the expense hasn't started yet
+        if (today < startOfDay(expenseStartDate)) {
+            continue;
+        }
+
         // Check if the expense is still active
         if (expense.installments !== null) {
-            const monthsPassed = differenceInCalendarMonths(today, expenseStartDate);
-            if (monthsPassed >= expense.installments) {
+            const lastInstallmentDate = new Date(expenseStartDate);
+            lastInstallmentDate.setMonth(lastInstallmentDate.getMonth() + expense.installments - 1);
+            if (today > lastInstallmentDate) {
                 continue; // Installments finished, skip
             }
         }
@@ -188,8 +195,8 @@ const handleRecurringExpenseChecks = async (userId: string, recurring: Recurring
             } else {
                 message = `Sua conta '${expense.description}' vence em ${daysUntilDue} dias.`;
             }
-
-             await createNotificationIfNotExists(userId, {
+            
+            await createNotificationIfNotExists(userId, {
                 type: 'recurring_due',
                 relatedId: expense.id,
                 message: message,
@@ -201,35 +208,48 @@ const handleRecurringExpenseChecks = async (userId: string, recurring: Recurring
 
 
 /**
- * Creates a notification document in Firestore if a notification with the same
- * type and relatedId does not already exist for the current month.
+ * Creates a notification if one for the same relatedId hasn't been generated today.
+ * It uses a separate collection with TTL to track generated notifications for 24 hours.
  * @param userId The ID of the user.
  * @param notificationData The core data for the notification.
  */
 const createNotificationIfNotExists = async (userId: string, notificationData: Omit<Notification, 'id' | 'userId' | 'isRead' | 'timestamp'>) => {
-    const notificationsCollection = getNotificationsCollection(userId);
-    const today = new Date();
+    // Unique ID for the daily generated notification record
+    const generatedNotificationId = `${notificationData.type}_${notificationData.relatedId}`;
+    const generatedDocRef = doc(getGeneratedNotificationsCollection(userId), generatedNotificationId);
 
-    const q = query(
-        notificationsCollection,
-        where("type", "==", notificationData.type),
-        where("relatedId", "==", notificationData.relatedId)
-    );
-    
-    const querySnapshot = await getDocs(q);
+    try {
+        const generatedDocSnap = await getDoc(generatedDocRef);
+        
+        // If the document exists and was created today, do nothing.
+        if (generatedDocSnap.exists() && isToday(generatedDocSnap.data().generatedAt.toDate())) {
+            return; 
+        }
 
-    // Check if any existing notification is from the current month
-    const hasNotificationThisMonth = querySnapshot.docs.some(doc => 
-        isSameMonth(doc.data().timestamp.toDate(), today)
-    );
-
-    if (!hasNotificationThisMonth) {
-        await addDoc(notificationsCollection, {
+        // If it doesn't exist or is from a previous day, create a new notification and the record.
+        const batch = writeBatch(db);
+        
+        // 1. Add the actual notification for the user to see
+        const newNotificationRef = doc(getNotificationsCollection(userId));
+        batch.set(newNotificationRef, {
             ...notificationData,
             userId,
             isRead: false,
             timestamp: Timestamp.now()
         });
+
+        // 2. Add the tracking record with a TTL
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        batch.set(generatedDocRef, {
+            generatedAt: Timestamp.now(),
+            expireAt: Timestamp.fromDate(tomorrow), // Set TTL for 24 hours
+        });
+
+        await batch.commit();
+
+    } catch (error) {
+        console.error("Error creating notification:", error);
     }
 };
 
