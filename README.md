@@ -64,4 +64,4 @@ Para executar este projeto em seu ambiente de desenvolvimento, siga os passos ab
 
 ---
 
-Feito com ❤️ por **Firebase Studio**.
+Feito com FirebaseStudio por **Eduardo Campos**.
