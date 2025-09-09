@@ -32,28 +32,8 @@ export async function signUp(data: any) {
   }
 }
 
-// In a real app, you'd typically handle sign-in on the client and post the ID token here.
-// For this example, we'll simulate the client-side token generation.
-// This part requires a custom solution or client-side interaction.
-// The placeholder below won't work directly in a real server action without client token.
-export async function signIn(data: { token: string }) {
+export async function signIn(data: any) {
     try {
-        if (!process.env.RECAPTCHA_SECRET_KEY) {
-            console.error("RECAPTCHA_SECRET_KEY is not set");
-            return { success: false, error: "Configuração do servidor incompleta." };
-        }
-
-        const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `secret=${process.env.RECAPTCHA_SECRET_KEY}&response=${data.token}`,
-        });
-        const recaptchaResponse = await response.json();
-        
-        if (!recaptchaResponse.success || recaptchaResponse.score < 0.5) {
-            return { success: false, error: "Falha na verificação do reCAPTCHA." };
-        }
-
         // Since we can't directly sign in on the server with email/password to get an ID token,
         // this part remains conceptual for server actions.
         // The actual sign-in will be client-side, and this action could be used to create a session

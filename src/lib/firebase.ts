@@ -3,7 +3,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 // Firebase configuration object is now hardcoded to prevent environment variable loading issues.
 // This is a public configuration and is safe to be exposed on the client-side.
@@ -20,15 +19,6 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-// Initialize App Check only on the client side
-if (typeof window !== 'undefined') {
-  // Pass the reCAPTCHA key directly to the provider
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider('6LdSpsIrAAAAAHw0CKUekCqq4GIMFZh1gwsFVoQG'),
-    isTokenAutoRefreshEnabled: true
-  });
-}
 
 const db = getFirestore(app);
 const auth = getAuth(app);

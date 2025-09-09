@@ -12,11 +12,6 @@ import {
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import {
-  GoogleReCaptchaProvider,
-  useGoogleReCaptcha,
-} from 'react-google-recaptcha-v3';
-import { signIn as serverSignIn } from './actions';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -79,12 +74,11 @@ type LoginValues = z.infer<typeof loginSchema>;
 type SignUpValues = z.infer<typeof signUpSchema>;
 
 
-function AuthPageComponent() {
+export default function AuthPage() {
   const [personType, setPersonType] = useState<'cpf' | 'cnpj'>('cpf');
   const [activeTab, setActiveTab] = useState('login');
   const { toast } = useToast();
   const router = useRouter();
-  const { executeRecaptcha } = useGoogleReCaptcha();
 
   // Redirect if user is already logged in
   useEffect(() => {
@@ -131,30 +125,8 @@ function AuthPageComponent() {
     }
   };
   
-  const handleReCaptchaVerify = useCallback(async () => {
-    if (!executeRecaptcha) {
-        toast({
-            variant: "destructive",
-            title: "Erro no reCAPTCHA",
-            description: "Não foi possível carregar o reCAPTCHA. Tente novamente mais tarde.",
-        });
-        return null;
-    }
-    const token = await executeRecaptcha('login');
-    return token;
-  }, [executeRecaptcha, toast]);
-
-
   const onLogin = async (values: LoginValues) => {
-    const token = await handleReCaptchaVerify();
-    if (!token) return;
-
     try {
-        const recaptchaResult = await serverSignIn({ token });
-        if (!recaptchaResult.success) {
-            throw new Error(recaptchaResult.error || "Falha na verificação do reCAPTCHA.");
-        }
-
         await signInWithEmailAndPassword(auth, values.email, values.password);
         toast({
             title: "Login bem-sucedido!",
@@ -398,12 +370,4 @@ function AuthPageComponent() {
       </Tabs>
     </div>
   );
-}
-
-export default function AuthPage() {
-    return (
-        <GoogleReCaptchaProvider reCaptchaKey="6LdSpsIrAAAAAHw0CKUekCqq4GIMFZh1gwsFVoQG">
-            <AuthPageComponent />
-        </GoogleReCaptchaProvider>
-    );
 }
