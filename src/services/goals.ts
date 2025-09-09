@@ -43,6 +43,9 @@ export const updateGoal = async (userId: string, goalId: string, goalData: Parti
          const dataToUpdate: any = { ...goalData };
         if (goalData.deadline) {
             dataToUpdate.deadline = Timestamp.fromDate(goalData.deadline as unknown as Date);
+        } else {
+            // If deadline is not provided or is null/undefined, ensure it's not in the update object
+            delete dataToUpdate.deadline;
         }
         await updateDoc(getGoalDoc(userId, goalId), dataToUpdate);
     } catch (error) {
