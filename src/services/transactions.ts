@@ -1,3 +1,4 @@
+
 'use client';
 
 import { 
@@ -60,10 +61,15 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
                 firestoreTransaction.update(goalDocRef, { currentAmount: newAmount });
             }
 
-            const newTransactionDoc = {
+            const newTransactionDoc: any = {
                 ...transactionData,
                 date: Timestamp.fromDate(transactionData.date as unknown as Date)
             };
+
+            if (!newTransactionDoc.goalId) {
+                delete newTransactionDoc.goalId;
+            }
+
             firestoreTransaction.set(doc(transactionsCollectionRef), newTransactionDoc);
         });
     } catch (error) {
