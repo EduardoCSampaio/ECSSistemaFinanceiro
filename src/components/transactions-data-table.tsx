@@ -223,19 +223,19 @@ export function TransactionsDataTable({
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between py-4">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4">
         <Input
           placeholder="Filtrar por descrição..."
           value={(table.getColumn('description')?.getFilterValue() as string) ?? ''}
           onChange={(event) =>
             table.getColumn('description')?.setFilterValue(event.target.value)
           }
-          className="max-w-sm"
+          className="w-full md:max-w-sm"
         />
-        <div className="flex items-center gap-2">
+        <div className="flex w-full md:w-auto items-center justify-end gap-2">
             <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-auto">
+                <Button variant="outline" className="flex-shrink-0">
                 <SlidersHorizontal className="mr-2 h-4 w-4"/> Colunas
                 </Button>
             </DropdownMenuTrigger>
@@ -271,11 +271,11 @@ export function TransactionsDataTable({
               categories={categories}
               onSave={onAddTransactionsBatch}
             >
-              <Button variant="outline">
-                  <Upload className="mr-2 h-4 w-4" /> Importar CSV
+              <Button variant="outline" className="flex-shrink-0">
+                  <Upload className="mr-2 h-4 w-4" /> Importar
               </Button>
             </ImportTransactionsDialog>
-            <Button onClick={openAddSheet}>
+            <Button onClick={openAddSheet} className="flex-shrink-0">
                 <PlusCircle className="mr-2 h-4 w-4" /> Nova Transação
             </Button>
         </div>
