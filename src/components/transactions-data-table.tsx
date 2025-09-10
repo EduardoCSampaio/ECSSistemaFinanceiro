@@ -223,16 +223,16 @@ export function TransactionsDataTable({
 
   return (
     <div className="w-full">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 py-4">
         <Input
           placeholder="Filtrar por descrição..."
           value={(table.getColumn('description')?.getFilterValue() as string) ?? ''}
           onChange={(event) =>
             table.getColumn('description')?.setFilterValue(event.target.value)
           }
-          className="w-full md:max-w-sm"
+          className="w-full max-w-sm"
         />
-        <div className="flex w-full md:w-auto items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
             <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex-shrink-0">
