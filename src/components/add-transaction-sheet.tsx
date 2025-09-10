@@ -125,13 +125,6 @@ export function AddTransactionSheet({
     }
   }, [transactionToEdit, isOpen, form]);
 
-  useEffect(() => {
-    if (isEditing) return;
-    form.setValue('type', activeTab as 'income' | 'expense');
-    form.setValue('categoryId', '');
-    form.setValue('goalId', undefined);
-  }, [activeTab, isEditing, form])
-
   async function onSubmit(data: TransactionFormValues) {
     try {
         await onSave(data);
@@ -153,6 +146,9 @@ export function AddTransactionSheet({
   const handleTabChange = (value: string) => {
     if (isEditing) return;
     setActiveTab(value);
+    form.setValue('type', value as 'income' | 'expense');
+    form.setValue('categoryId', '');
+    form.setValue('goalId', undefined);
   }
 
   return (
